@@ -1,8 +1,11 @@
 #![feature(phase)]
 #![feature(if_let)]
 
-#[phase(plugin, link)]
-extern crate ecs;
+#[phase(plugin)]
+extern crate rustecs_macros;
+
+extern crate rustecs;
+extern crate serialize;
 extern crate piston;
 extern crate sdl2_game_window;
 extern crate opengl_graphics;
@@ -15,6 +18,7 @@ use std::num::abs;
 
 use opengl_graphics::{
     Gl,
+    Texture,
 };
 use sdl2_game_window::WindowSDL2;
 use piston::{
@@ -40,168 +44,108 @@ use piston::event::{
 use piston::input::{
     Focus,
 };
-use ecs::{
+
+use rustecs::{
+    Entities,
     Components,
-    WorldBuilder,
-    Entity,
-    EntityData,
-    EntityBuilder,
-    Aspect
-};
-use ecs::system::entitysystem::{
-    BulkEntitySystem,
-    BulkEntityProcess,
 };
 
-struct DrawSystem {
-    gl: RefCell<Gl>,
-    event: Rc<RefCell<Event>>,
-}
-
-impl DrawSystem {
-    fn new(event: Rc<RefCell<Event>>) -> DrawSystem {
-        let opengl = piston::shader_version::opengl::OpenGL_3_2;
-        DrawSystem {
-            gl: RefCell::new(Gl::new(opengl)),
-            event: event
-        }
-    }
-}
-
-impl BulkEntityProcess for DrawSystem {
-  fn process(&self, es: Vec<&Entity>, data: &mut EntityData) {
-    if let &Render(args) = self.event.borrow().deref() {
+fn drawSystem(event: &Event,
+              gl: &mut Gl,
+              positions: &mut Components<Position>,
+              shapes: &mut Components<Shape>) {
+    if let &Render(args) = event {
         let w = args.width as f64;
         let h = args.height as f64;
-        let mut gl_cell = self.gl.borrow_mut();
-        let gl = gl_cell.deref_mut();
         gl.viewport(0, 0, w as i32, h as i32);
         let c = Context::abs(w, h);
         // Clear background.
         c.rgb(0.0, 0.0, 0.0).draw(gl);
 
-        for e in es.iter() {
-          let mut x: f64 = 0.0;
-          let mut y: f64 = 0.0;
+        for (eid, pos) in positions.iter_mut() {
           let mut shape = Point;
           let mut border = None;
-          if let Some(p) = data.borrow::<PositionComponent>(*e) {
-            x = p.x;
-            y = p.y;
-          }
-          if let Some(s) = data.borrow::<ShapeComponent>(*e) {
-            shape = s.shape;
-            border = s.border;
+          if shapes.contains_key(eid) {
+            shape = shapes.get_mut(eid).shape;
+            border = shapes.get_mut(eid).border;
           }
           let r = 0.5;
           let g = 0.2;
           let b = 0.8;
+          let mut drawing = c.rgb(r, g, b);
           match (shape, border) {
-              (Point, Some(border)) => {
-                  c.rgb(r, g, b)
-                    .rect(x, y, 1.0, 1.0)
-                    .border_radius(border)
-                    .draw(gl);
-              },
-              (Circle(rad), Some(border)) => {
-                  c.rgb(r, g, b)
-                    .ellipse(x, y, rad, rad)
-                    .border_radius(border)
-                    .draw(gl);
-              },
-              (Square(w,h), Some(border)) => {
-                  c.rgb(r, g, b)
-                    .rect(x, y, w, h)
-                    .border_radius(border)
-                    .draw(gl);
-              },
-              (Point, None) => {
-                  c.rgb(r, g, b)
-                    .rect(x, y, 1.0, 1.0)
-                    .draw(gl);
-              },
-              (Circle(rad), None) => {
-                  c.rgb(r, g, b)
-                    .ellipse(x, y, rad, rad)
-                    .draw(gl);
-              },
-              (Square(w,h), None) => {
-                  c.rgb(r, g, b)
-                    .rect(x, y, w, h)
-                    .draw(gl);
-              }
-          }
+              (Point, None)    => drawing.rect(1.0, 1.0, w, h).draw(gl),
+              (Point, Some(b)) => drawing.rect(1.0, 1.0, w, h).border_radius(b).draw(gl),
+
+              (Circle(rad), None)    => drawing.ellipse(pos.x, pos.y, rad, rad).draw(gl),
+              (Circle(rad), Some(b)) => drawing.ellipse(pos.x, pos.y, rad, rad).border_radius(b).draw(gl),
+
+              (Square(w,h), None)    => drawing.rect(pos.x, pos.y, w, h).draw(gl),
+              (Square(w,h), Some(b)) => drawing.rect(pos.x, pos.y, w, h).border_radius(b).draw(gl),
+          };
         }
     }
-  }
 }
 
-struct MoveSystem {
-    event: Rc<RefCell<Event>>
-}
-
-impl MoveSystem {
-  fn new(event: Rc<RefCell<Event>>) -> MoveSystem {
-    MoveSystem {
-        event: event
-    }
-  }
-}
-
-impl BulkEntityProcess for MoveSystem {
-  fn process(&self, es: Vec<&Entity>, data: &mut EntityData) {
-    if let &Update(args) = self.event.borrow().deref() {
+fn moveSystem(event: &Event,
+              positions: &mut Components<Position>,
+              velocities: &mut Components<Velocity>) {
+    if let &Update(args) = event {
         let dt = args.dt;
-        for e in es.iter() {
-          let xv;
-          let yv;
-          if let Some(ref mut velocity) = data.borrow::<VelocityComponent>(*e) {
-              xv = velocity.x;
-              yv = velocity.y;
-          } else {
-            return
-          }
-          if let Some(ref mut position) = data.borrow::<PositionComponent>(*e) {
-            position.x += xv * dt;
-            position.y += yv * dt;
-          }
+        for (eid, position) in positions.iter_mut() {
+            if !velocities.contains_key(eid) {
+                continue;
+            }
+
+            // If we have both a position and a velocity, integrate.
+            let velocity = velocities.get_mut(eid);
+            position.x += velocity.x * dt;
+            position.y += velocity.y * dt;
+            if position.x > 800.0 || position.x < 0.0 {
+                velocity.x *= -1.0;
+            }
+            if position.y > 600.0 || position.y < 0.0 {
+                velocity.y *= -1.0;
+            }
         }
     }
-  }
 }
 
-component!(PositionComponent {
+#[deriving(Clone, Decodable, Encodable, PartialEq, Show)]
+pub struct Position {
     x: f64,
     y: f64
-})
+}
 
-#[deriving(Clone, PartialEq, Show)]
-pub enum Shape {
+#[deriving(Clone, Decodable, Encodable, PartialEq, Show)]
+pub enum ShapeVarient {
     Point,
     Circle(f64), // radius
     Square(f64, f64), // width, height
 }
 
-impl Default for Shape {
-    fn default() -> Shape { Point }
+impl Default for ShapeVarient {
+    fn default() -> ShapeVarient { Point }
 }
 
-component!(ShapeComponent {
-    shape: Shape,
+#[deriving(Clone, Decodable, Encodable, PartialEq, Show)]
+pub struct Shape {
+    shape: ShapeVarient,
     border: Option<f64>
-})
+}
 
-component!(VelocityComponent {
+#[deriving(Clone, Decodable, Encodable, PartialEq, Show)]
+pub struct Velocity {
     x: f64,
     y: f64
-})
+}
+
+world! {
+    World,
+    components Position, Shape, Velocity;
+}
 
 fn main() {
-    let ecs_event: Rc<RefCell<Event>> =
-        Rc::new(
-            RefCell::new(Input(Focus(false)))
-        );
-
     let opengl = piston::shader_version::opengl::OpenGL_3_2;
     let mut window = WindowSDL2::new(
         opengl,
@@ -214,52 +158,42 @@ fn main() {
         }
     );
 
-    let mut world_builder = WorldBuilder::new();
-    world_builder.register_component::<PositionComponent>();
-    world_builder.register_component::<VelocityComponent>();
-    world_builder.register_component::<ShapeComponent>();
+    let mut gl = Gl::new(opengl);
 
-    let aspect = Aspect::for_all(component_ids!(PositionComponent));
-    let draw_sys = DrawSystem::new(ecs_event.clone());
-    let sys = BulkEntitySystem::new(box draw_sys, aspect);
-    world_builder.register_system(box sys);
-
-    let maspect = Aspect::for_all(component_ids!(PositionComponent, VelocityComponent));
-    let move_sys = MoveSystem::new(ecs_event.clone());
-    let bsys = BulkEntitySystem::new(box move_sys, maspect);
-    world_builder.register_system(box bsys);
-
-    let ref mut world = world_builder.build();
+    let mut world = World::new();
 
     let num_things: i32 = 300;
 
     let ref mut rng = rand::task_rng();
     for _ in range(0, num_things) {
-        let r = 30.0;
+        let r = rng.gen_range(10.0, 40.0);
+        let shape = if rng.gen() {
+            Square(r, r)
+        } else {
+            Circle(r)
+        };
+        let border = Some(rng.gen_range(1.0, 3.0));
+
         let x = (800.0 - r) / 2.0;
         let y = (600.0 - r) / 2.0;
-        let d = PositionComponent { x: x, y: y };
-        let m = VelocityComponent {
-          x: rng.gen_range(-80.0, 80.0),
-          y: rng.gen_range(-80.0, 80.0),
-        };
-        let shape = ShapeComponent {
-          shape: if rng.gen() {
-                     Square(r, r)
-                 } else {
-                     Circle(r)
-                 },
-          border: if rng.gen() {
-                     Some(rng.gen_range(1.0, 5.0))
-                 } else {
-                     None
-                 }
-        };
-        world.build_entity(|c: &mut Components, e: Entity| {
-            c.add(&e, d);
-            c.add(&e, m);
-            c.add(&e, shape);
-        });
+
+        let e = Entity::new()
+            .with_position(
+                Position{
+                    x: x,
+                    y: y
+                })
+            .with_velocity(
+                Velocity {
+                    x: rng.gen_range(-80.0, 80.0),
+                    y: rng.gen_range(-80.0, 80.0)
+                })
+            .with_shape(
+                Shape {
+                    shape: shape,
+                    border: border
+                });
+        world.add(e);
     }
     let event_settings = EventSettings {
         updates_per_second: 120,
@@ -267,7 +201,7 @@ fn main() {
     };
 
     for e in EventIterator::new(&mut window, &event_settings) {
-        *ecs_event.borrow_mut() = e.clone();
-        world.update();
+        moveSystem(&e, &mut world.positions, &mut world.velocities);
+        drawSystem(&e, &mut gl, &mut world.positions, &mut world.shapes);
     }
 }
