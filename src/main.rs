@@ -50,6 +50,9 @@ use rustecs::{
     Components,
 };
 
+static WINDOW_W: f64 = 800.0;
+static WINDOW_H: f64 = 600.0;
+
 fn drawSystem(event: &Event,
               gl: &mut Gl,
               positions: &mut Components<Position>,
@@ -114,10 +117,10 @@ fn moveSystem(event: &Event,
             let velocity = velocities.get_mut(eid);
             position.x += velocity.x * dt;
             position.y += velocity.y * dt;
-            if position.x > 800.0 || position.x < 0.0 {
+            if position.x > WINDOW_W || position.x < 0.0 {
                 velocity.x *= -1.0;
             }
-            if position.y > 600.0 || position.y < 0.0 {
+            if position.y > WINDOW_H || position.y < 0.0 {
                 velocity.y *= -1.0;
             }
         }
@@ -171,7 +174,7 @@ fn main() {
         opengl,
         WindowSettings {
             title: "Shooter".to_string(),
-            size: [800, 600],
+            size: [WINDOW_W as u32, WINDOW_H as u32],
             fullscreen: false,
             exit_on_esc: true,
             samples: 4,
@@ -194,8 +197,8 @@ fn main() {
         };
         let border = Some(rng.gen_range(1.0, 3.0));
 
-        let x = (800.0 - r) / 2.0;
-        let y = (600.0 - r) / 2.0;
+        let x = (WINDOW_W - r) / 2.0;
+        let y = (WINDOW_H - r) / 2.0;
 
         let e = Entity::new()
             .with_position(
