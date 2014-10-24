@@ -53,7 +53,8 @@ use rustecs::{
 fn drawSystem(event: &Event,
               gl: &mut Gl,
               positions: &mut Components<Position>,
-              shapes: &mut Components<Shape>) {
+              shapes: &mut Components<Shape>,
+              colors: &mut Components<Color>) {
     if let &Render(args) = event {
         let w = args.width as f64;
         let h = args.height as f64;
@@ -69,9 +70,11 @@ fn drawSystem(event: &Event,
             shape = shapes.get_mut(eid).shape;
             border = shapes.get_mut(eid).border;
           }
-          let r = 0.5;
-          let g = 0.2;
-          let b = 0.8;
+          let (r, g, b) = if colors.contains_key(eid) {
+              (colors.get_mut(eid).r, colors.get_mut(eid).g, colors.get_mut(eid).b)
+          } else {
+              (1.0, 1.0, 1.0)
+          };
           let mut drawing = c.rgb(r, g, b);
           match (shape, border) {
               (Point, None)    => drawing.rect(1.0, 1.0, w, h).draw(gl),
@@ -84,6 +87,16 @@ fn drawSystem(event: &Event,
               (Square(w,h), Some(b)) => drawing.rect(pos.x, pos.y, w, h).border_radius(b).draw(gl),
           };
         }
+    }
+}
+
+fn shimmerSystem(event: &Event,
+                 colors: &mut Components<Color>) {
+    for (_, color) in colors.iter_mut() {
+        let ref mut rng = rand::task_rng();
+        color.r = rng.gen_range(0.5, 1.0);
+        color.g = rng.gen_range(0.5, 1.0);
+        color.b = rng.gen_range(0.5, 1.0);
     }
 }
 
@@ -118,6 +131,13 @@ pub struct Position {
 }
 
 #[deriving(Clone, Decodable, Encodable, PartialEq, Show)]
+pub struct Color {
+    r: f32,
+    g: f32,
+    b: f32
+}
+
+#[deriving(Clone, Decodable, Encodable, PartialEq, Show)]
 pub enum ShapeVarient {
     Point,
     Circle(f64), // radius
@@ -142,7 +162,7 @@ pub struct Velocity {
 
 world! {
     World,
-    components Position, Shape, Velocity;
+    components Position, Shape, Velocity, Color;
 }
 
 fn main() {
@@ -192,6 +212,12 @@ fn main() {
                 Shape {
                     shape: shape,
                     border: border
+                })
+            .with_color(
+                Color{
+                    r: 1.0,
+                    g: 0.5,
+                    b: 0.2
                 });
         world.add(e);
     }
@@ -202,6 +228,7 @@ fn main() {
 
     for e in EventIterator::new(&mut window, &event_settings) {
         moveSystem(&e, &mut world.positions, &mut world.velocities);
-        drawSystem(&e, &mut gl, &mut world.positions, &mut world.shapes);
+        shimmerSystem(&e, &mut world.colors);
+        drawSystem(&e, &mut gl, &mut world.positions, &mut world.shapes, &mut world.colors);
     }
 }
