@@ -268,10 +268,9 @@ fn make_ball(world: &mut World) {
     let x = (WINDOW_W - BALL_R) / 2.0;
     let y = (WINDOW_H - BALL_R) / 2.0;
 
-    fn random_vel() -> f64 {
-        let ref mut rng = rand::task_rng();
-        rng.gen_range(80.0, 100.0) * if rng.gen() { 1.0 } else { -1.0 }
-    }
+    let ref mut rng = rand::task_rng();
+    let vx = rng.gen_range(100.0, 200.0) * if rng.gen() { 1.0 } else { -1.0 };
+    let vy = rng.gen_range(-200.0, 200.0);
 
     let e = Entity::new()
         .with_shimmer(Shimmer)
@@ -282,8 +281,8 @@ fn make_ball(world: &mut World) {
             })
         .with_velocity(
             Velocity {
-                x: random_vel(),
-                y: random_vel()
+                x: vx,
+                y: vy
             })
         .with_shape(
             Shape {
