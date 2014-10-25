@@ -64,6 +64,7 @@ fn draw_system(event: &Event,
         let c = Context::abs(w, h);
         // Clear background.
         c.rgb(0.2, 0.2, 0.2).draw(gl);
+        c.rgb(0.7, 0.7, 0.7).rect(0.0, 0.0, WINDOW_W, WINDOW_H).border_radius(1.0).draw(gl);
 
         for (eid, pos) in positions.iter_mut() {
           let mut shape = Point;
@@ -260,7 +261,7 @@ world! {
         WindowClamp;
 }
 
-fn make_ball() -> Entity {
+fn make_ball(world: &mut World) {
     const BALL_R: f64 = 20.0;
     let shape = Circle(BALL_R);
     let x = (WINDOW_W - BALL_R) / 2.0;
@@ -271,7 +272,7 @@ fn make_ball() -> Entity {
         rng.gen_range(80.0, 100.0) * if rng.gen() { 1.0 } else { -1.0 }
     }
 
-    Entity::new()
+    let e = Entity::new()
         .with_shimmer(Shimmer)
         .with_position(
             Position{
@@ -297,10 +298,11 @@ fn make_ball() -> Entity {
         .with_window_clamp(
             WindowClamp {
                varient: Bounce
-            })
+            });
+    world.add(e);
 }
 
-fn make_player(p1: bool) -> Entity {
+fn make_player(world: &mut World, p1: bool) -> u32 {
     const FROM_WALL: f64 = 20.0;
     const PADDLE_W: f64 = 20.0;
     const PADDLE_H: f64 = 150.0;
@@ -310,7 +312,7 @@ fn make_player(p1: bool) -> Entity {
         WINDOW_W - FROM_WALL - PADDLE_W
     };
     let y = (WINDOW_H - PADDLE_H) / 2.0;
-    Entity::new()
+    let e = Entity::new()
         .with_player_controller(
             PlayerController {
                 up: if p1 { keyboard::W } else { keyboard::I },
@@ -336,7 +338,8 @@ fn make_player(p1: bool) -> Entity {
         .with_window_clamp(
             WindowClamp {
                varient: Stop
-            })
+            });
+    world.add(e)
 }
 
 fn main() {
@@ -355,9 +358,9 @@ fn main() {
     let mut gl = Gl::new(opengl);
     let mut world = World::new();
 
-    world.add(make_player(true));
-    world.add(make_player(false));
-    world.add(make_ball());
+    make_player(&mut world, true);
+    make_player(&mut world, false);
+    make_ball(&mut world);
 
     let event_settings = EventSettings {
         updates_per_second: 120,
