@@ -63,13 +63,13 @@ fn draw_system(event: &Event,
         gl.viewport(0, 0, w as i32, h as i32);
         let c = Context::abs(w, h);
         // Clear background.
-        c.rgb(0.0, 0.0, 0.0).draw(gl);
+        c.rgb(0.2, 0.2, 0.2).draw(gl);
 
         for (eid, pos) in positions.iter_mut() {
           let mut shape = Point;
           let mut border = None;
           if shapes.contains_key(eid) {
-            shape = shapes.get_mut(eid).shape;
+            shape = shapes.get_mut(eid).varient;
             border = shapes.get_mut(eid).border;
           }
           let (r, g, b) = if colors.contains_key(eid) {
@@ -108,6 +108,8 @@ fn shimmer_system(shimmers: &mut Components<Shimmer>,
 
 fn move_system(event: &Event,
               positions: &mut Components<Position>,
+              shapes: &mut Components<Shape>,
+              clamps: &mut Components<WindowClamp>,
               velocities: &mut Components<Velocity>) {
     if let &Update(args) = event {
         let dt = args.dt;
@@ -120,11 +122,53 @@ fn move_system(event: &Event,
             let velocity = velocities.get_mut(eid);
             position.x += velocity.x * dt;
             position.y += velocity.y * dt;
-            if position.x > WINDOW_W || position.x < 0.0 {
-                velocity.x *= -1.0;
+
+            if !clamps.contains_key(eid) {
+              continue;
             }
-            if position.y > WINDOW_H || position.y < 0.0 {
-                velocity.y *= -1.0;
+            let (w, h) = match shapes.find(eid) {
+                Some(&s) =>
+                  match s.varient {
+                    Circle(r) => (r, r),
+                    Square(w,h) => (w, h),
+                    Point => (0.0, 0.0)
+                  },
+                None => (0.0, 0.0)
+            };
+
+            let clamp = clamps.get_mut(eid);
+            let velocity_mult = match clamp.varient {
+              Bounce => -1.0,
+              Stop => 0.0,
+              _ => 1.0
+            };
+            match clamp.varient {
+              Bounce | Stop => {
+                if position.x + w > WINDOW_W {
+                  position.x = WINDOW_W - w;
+                  velocity.x *= velocity_mult;
+                } else if position.x < 0.0 {
+                  position.x = 0.0;
+                  velocity.x *= velocity_mult;
+                }
+                if position.y + h > WINDOW_H {
+                  position.y = WINDOW_H - h;
+                  velocity.y *= velocity_mult;
+                } else if position.y < 0.0 {
+                  position.y = 0.0;
+                  velocity.y *= velocity_mult;
+                }
+              },
+              Remove => {
+                if position.x > WINDOW_W
+                || position.x + w < 0.0 {
+                  println!("Should delete {}", eid);
+                }
+                if position.y > WINDOW_H
+                || position.y + h < 0.0 {
+                  println!("Should delete {}", eid);
+                }
+              }
             }
         }
     }
@@ -151,6 +195,18 @@ fn control_system(event: &Event,
             }
         });
     }
+}
+
+#[deriving(Clone, Decodable, Encodable, PartialEq, Show)]
+pub enum ClampVarient {
+    Bounce,
+    Stop,
+    Remove // Acts when item leaves window.
+}
+
+#[deriving(Clone, Decodable, Encodable, PartialEq, Show)]
+pub struct WindowClamp {
+    varient: ClampVarient
 }
 
 #[deriving(Clone, Decodable, Encodable, PartialEq, Show)]
@@ -188,7 +244,7 @@ impl Default for ShapeVarient {
 
 #[deriving(Clone, Decodable, Encodable, PartialEq, Show)]
 pub struct Shape {
-    shape: ShapeVarient,
+    varient: ShapeVarient,
     border: Option<f64>
 }
 
@@ -200,7 +256,8 @@ pub struct Velocity {
 
 world! {
     World,
-    components Position, Shape, Velocity, Color, Shimmer, PlayerController;
+    components Position, Shape, Velocity, Color, Shimmer, PlayerController,
+        WindowClamp;
 }
 
 fn make_ball() -> Entity {
@@ -228,7 +285,7 @@ fn make_ball() -> Entity {
             })
         .with_shape(
             Shape {
-                shape: shape,
+                varient: shape,
                 border: None
             })
         .with_color(
@@ -236,6 +293,10 @@ fn make_ball() -> Entity {
                 r: 1.0,
                 g: 0.5,
                 b: 0.2
+            })
+        .with_window_clamp(
+            WindowClamp {
+               varient: Bounce
             })
 }
 
@@ -263,7 +324,7 @@ fn make_player(p1: bool) -> Entity {
             })
         .with_shape(
             Shape {
-                shape: Square(PADDLE_W, PADDLE_H),
+                varient: Square(PADDLE_W, PADDLE_H),
                 border: None
             })
         .with_color(
@@ -271,6 +332,10 @@ fn make_player(p1: bool) -> Entity {
                 r: 0.5,
                 g: 0.2,
                 b: 0.8
+            })
+        .with_window_clamp(
+            WindowClamp {
+               varient: Stop
             })
 }
 
@@ -301,7 +366,8 @@ fn main() {
 
     for e in EventIterator::new(&mut window, &event_settings) {
         control_system(&e, &mut world.player_controllers, &mut world.velocities);
-        move_system(&e, &mut world.positions, &mut world.velocities);
+        move_system(&e, &mut world.positions, &mut world.shapes,
+                    &mut world.window_clamps, &mut world.velocities);
         shimmer_system(&mut world.shimmers, &mut world.colors);
         draw_system(&e, &mut gl, &mut world.positions, &mut world.shapes, &mut world.colors);
     }
