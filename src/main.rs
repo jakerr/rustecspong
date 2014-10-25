@@ -42,6 +42,7 @@ use piston::event::{
 use piston::input::{
     keyboard,
     Keyboard,
+    Button,
 };
 use rustecs::{
     Entities,
@@ -130,32 +131,32 @@ fn move_system(event: &Event,
 }
 
 fn control_system(event: &Event,
-              player_eids: &[u32, ..2],
+              controllers: &mut Components<PlayerController>,
               velocities: &mut Components<Velocity>) {
 
     const PADDLE_V: f64 = 800.0;
-    let p1 = &player_eids[0];
-    let p2 = &player_eids[1];
-    event.press(|button| {
-        if button == Keyboard(keyboard::W) {
-            velocities.get_mut(p1).y = -PADDLE_V;
-        } else if button == Keyboard(keyboard::S) {
-            velocities.get_mut(p1).y = PADDLE_V;
-        } else if button == Keyboard(keyboard::I) {
-            velocities.get_mut(p2).y = -PADDLE_V;
-        } else if button == Keyboard(keyboard::K) {
-            velocities.get_mut(p2).y = PADDLE_V;
-        }
-    });
-    event.release(|button| {
-        if button == Keyboard(keyboard::W)
-        || button == Keyboard(keyboard::S) {
-            velocities.get_mut(p1).y = 0.0;
-        } else if button == Keyboard(keyboard::I)
-               || button == Keyboard(keyboard::K) {
-            velocities.get_mut(p2).y = 0.0;
-        }
-    });
+
+    for (eid, controller) in controllers.iter_mut() {
+        event.press(|button| {
+            if button == Keyboard(controller.up) {
+                velocities.get_mut(eid).y = -PADDLE_V;
+            } else if button == Keyboard(controller.down) {
+                velocities.get_mut(eid).y = PADDLE_V;
+            }
+        });
+        event.release(|button| {
+            if button == Keyboard(controller.up)
+            || button == Keyboard(controller.down) {
+                velocities.get_mut(eid).y = 0.0;
+            }
+        });
+    }
+}
+
+#[deriving(Clone, Decodable, Encodable, PartialEq, Show)]
+pub struct PlayerController {
+    up: keyboard::Key,
+    down: keyboard::Key
 }
 
 #[deriving(Clone, Decodable, Encodable, PartialEq, Show)]
@@ -199,7 +200,7 @@ pub struct Velocity {
 
 world! {
     World,
-    components Position, Shape, Velocity, Color, Shimmer;
+    components Position, Shape, Velocity, Color, Shimmer, PlayerController;
 }
 
 fn make_ball() -> Entity {
@@ -249,6 +250,11 @@ fn make_player(p1: bool) -> Entity {
     };
     let y = (WINDOW_H - PADDLE_H) / 2.0;
     Entity::new()
+        .with_player_controller(
+            PlayerController {
+                up: if p1 { keyboard::W } else { keyboard::I },
+                down: if p1 { keyboard::S } else { keyboard::K }
+            })
         .with_velocity(Velocity { x: 0.0, y: 0.0 } )
         .with_position(
             Position{
@@ -284,10 +290,8 @@ fn main() {
     let mut gl = Gl::new(opengl);
     let mut world = World::new();
 
-    let players = [
-        world.add(make_player(true)),
-        world.add(make_player(false))
-    ];
+    world.add(make_player(true));
+    world.add(make_player(false));
     world.add(make_ball());
 
     let event_settings = EventSettings {
@@ -296,7 +300,7 @@ fn main() {
     };
 
     for e in EventIterator::new(&mut window, &event_settings) {
-        control_system(&e, &players, &mut world.velocities);
+        control_system(&e, &mut world.player_controllers, &mut world.velocities);
         move_system(&e, &mut world.positions, &mut world.velocities);
         shimmer_system(&mut world.shimmers, &mut world.colors);
         draw_system(&e, &mut gl, &mut world.positions, &mut world.shapes, &mut world.colors);
