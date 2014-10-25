@@ -1,12 +1,12 @@
 [package]
 
-name = "shooter"
+name = "rustecspong"
 version = "0.0.1"
 authors = ["Jake Kerr <kodafox@gmail.com>"]
 
 [[bin]]
 
-name = "shooter"
+name = "rustecspong"
 
 [dependencies.piston]
 git = "https://github.com/pistondevelopers/piston"

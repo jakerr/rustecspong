@@ -1,5 +1,5 @@
 [root]
-name = "shooter"
+name = "rustecspong"
 version = "0.0.1"
 dependencies = [
  "opengl_graphics 0.0.0 (git+https://github.com/pistondevelopers/opengl_graphics#4a815e0ba92c0879d87855af4f0bdbeb78398900)",
@@ -57,8 +57,8 @@ dependencies = [
 
 [[package]]
 name = "image"
-version = "0.0.0"
-source = "git+https://github.com/pistondevelopers/image#2184609a44f38b659aa65dafe690ed380c20f538"
+version = "0.1.0"
+source = "git+https://github.com/pistondevelopers/image#c37cfafa811b437b5827a90af48a074c71cb2a6b"
 
 [[package]]
 name = "input"
@@ -82,7 +82,7 @@ source = "git+https://github.com/pistondevelopers/opengl_graphics#4a815e0ba92c08
 dependencies = [
  "gl 0.0.1 (git+https://github.com/bjz/gl-rs#9bdee3839e809a1f7ccbee158a38a704965528b3)",
  "graphics 0.0.0 (git+https://github.com/pistondevelopers/graphics#ebc9b1736c4da249b11bd34e3ee2500a5114c522)",
- "image 0.0.0 (git+https://github.com/pistondevelopers/image#2184609a44f38b659aa65dafe690ed380c20f538)",
+ "image 0.1.0 (git+https://github.com/pistondevelopers/image#c37cfafa811b437b5827a90af48a074c71cb2a6b)",
  "shader_version 0.0.0 (git+https://github.com/pistondevelopers/shader_version#c561d15e7d3a561271222daefe073054f5d62b8c)",
 ]
 
@@ -95,7 +95,7 @@ dependencies = [
  "event 0.0.0 (git+https://github.com/pistondevelopers/event#09c4ebe29884f7190339480a1ef21189ad660c2a)",
  "genmesh 0.1.0 (git+https://github.com/csherratt/genmesh.git#d68da4cb69e11a8e69b41b679e97985db2aecf13)",
  "graphics 0.0.0 (git+https://github.com/pistondevelopers/graphics#ebc9b1736c4da249b11bd34e3ee2500a5114c522)",
- "image 0.0.0 (git+https://github.com/pistondevelopers/image#2184609a44f38b659aa65dafe690ed380c20f538)",
+ "image 0.1.0 (git+https://github.com/pistondevelopers/image#c37cfafa811b437b5827a90af48a074c71cb2a6b)",
  "input 0.0.0 (git+https://github.com/PistonDevelopers/input#17ca9c4a96cf56b3c3c5c01824ee237e37542b00)",
  "noise-rs 0.0.1 (git+https://github.com/bjz/noise-rs#efd7125385cacae0f911032345729c8cfd98f72c)",
  "shader_version 0.0.0 (git+https://github.com/pistondevelopers/shader_version#c561d15e7d3a561271222daefe073054f5d62b8c)",
