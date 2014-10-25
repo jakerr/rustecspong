@@ -108,6 +108,7 @@ fn shimmer_system(shimmers: &mut Components<Shimmer>,
 }
 
 fn move_system(event: &Event,
+               to_delete: &mut Vec<u32>,
               positions: &mut Components<Position>,
               shapes: &mut Components<Shape>,
               clamps: &mut Components<WindowClamp>,
@@ -163,11 +164,11 @@ fn move_system(event: &Event,
               Remove => {
                 if position.x > WINDOW_W
                 || position.x + w < 0.0 {
-                  println!("Should delete {}", eid);
+                  to_delete.push(*eid);
                 }
                 if position.y > WINDOW_H
                 || position.y + h < 0.0 {
-                  println!("Should delete {}", eid);
+                  to_delete.push(*eid);
                 }
               }
             }
@@ -367,11 +368,20 @@ fn main() {
         max_frames_per_second: 60,
     };
 
+    let mut to_delete: Vec<u32> = vec!();
     for e in EventIterator::new(&mut window, &event_settings) {
         control_system(&e, &mut world.player_controllers, &mut world.velocities);
-        move_system(&e, &mut world.positions, &mut world.shapes,
-                    &mut world.window_clamps, &mut world.velocities);
+        move_system(&e,
+                    &mut to_delete,
+                    &mut world.positions,
+                    &mut world.shapes,
+                    &mut world.window_clamps,
+                    &mut world.velocities);
         shimmer_system(&mut world.shimmers, &mut world.colors);
         draw_system(&e, &mut gl, &mut world.positions, &mut world.shapes, &mut world.colors);
+        for v in to_delete.iter() {
+          world.remove(*v);
+        }
+        to_delete.clear();
     }
 }
