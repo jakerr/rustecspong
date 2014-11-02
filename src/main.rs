@@ -7,6 +7,7 @@ extern crate rustecs_macros;
 extern crate rustecs;
 extern crate serialize;
 extern crate piston;
+extern crate graphics;
 extern crate sdl2_window;
 extern crate opengl_graphics;
 
@@ -15,7 +16,7 @@ extern crate "nalgebra" as na;
 extern crate ncollide;
 
 use na::{Vec2, Translation};
-use ncollide::geom::{Ball};
+use ncollide::geom::{Ball, Plane, Cuboid};
 use nphysics::world::World;
 use nphysics::object::{RigidBody, RigidBodyHandle};
 
@@ -34,13 +35,18 @@ use piston::{
     EventSettings,
     WindowSettings,
 };
-use piston::graphics::{
+use graphics::{
     AddBorder,
     AddRectangle,
     AddEllipse,
     AddColor,
     Context,
     Draw,
+};
+use graphics::vecmath;
+use graphics::can::{
+    CanTransform,
+    CanViewTransform
 };
 use piston::event::{
     PressEvent,
@@ -58,9 +64,11 @@ use rustecs::{
     EntityContainer,
 };
 
-static WINDOW_W: f64 = 800.0;
-static WINDOW_H: f64 = 600.0;
-static WINDOW_PADDING: i32 = 20;
+const WINDOW_W: f64 = 800.0;
+const WINDOW_H: f64 = 600.0;
+const WINDOW_PADDING: i32 = 20;
+
+static PIXELS_PER_METER: i32 = 150;
 
 fn draw_system(event: &Event,
               gl: &mut Gl,
@@ -77,8 +85,9 @@ fn draw_system(event: &Event,
         let c = Context::abs(w, h);
         // Clear background.
         c.rgb(0.2, 0.2, 0.2).draw(gl);
-        c.rgb(0.7, 0.7, 0.7).rect(0.0, 0.0, WINDOW_W, WINDOW_H).border_radius(1.0).draw(gl);
+        c.rgb(0.7, 0.7, 0.7).rect(0.0, 0.0, WINDOW_W, WINDOW_H).border_radius(1.0).transform(vecmath::scale(0.5, 0.5)).draw(gl);
 
+        let c = Context::abs(w, h);
         for (eid, pos) in positions.iter_mut() {
           let mut shape = Point;
           let mut border = None;
@@ -91,13 +100,13 @@ fn draw_system(event: &Event,
           } else {
               (1.0, 1.0, 1.0)
           };
-          let drawing = c.rgb(r, g, b);
+          let drawing = c.rgb(r, g, b).view_transform(vecmath::rotate_radians(1.047));
           match (shape, border) {
               (Point, None)    => drawing.rect(1.0, 1.0, w, h).draw(gl),
               (Point, Some(b)) => drawing.rect(1.0, 1.0, w, h).border_radius(b).draw(gl),
 
-              (Circle(rad), None)    => drawing.ellipse(pos.x, pos.y, rad, rad).draw(gl),
-              (Circle(rad), Some(b)) => drawing.ellipse(pos.x, pos.y, rad, rad).border_radius(b).draw(gl),
+              (Circle(rad), None)    => drawing.circle(pos.x, pos.y, rad).draw(gl),
+              (Circle(rad), Some(b)) => drawing.circle(pos.x, pos.y, rad).border_radius(b).draw(gl),
 
               (Square(w,h), None)    => drawing.rect(pos.x, pos.y, w, h).draw(gl),
               (Square(w,h), Some(b)) => drawing.rect(pos.x, pos.y, w, h).border_radius(b).draw(gl),
@@ -135,8 +144,8 @@ fn phys_system(event: &Event,
           let phys_pos = na::translation(transform);
 
           let position = positions.get_mut(eid);
-          position.x = phys_pos.x as f64;
-          position.y = phys_pos.y as f64;
+          position.x = PIXELS_PER_METER as f64 * phys_pos.x as f64;
+          position.y = PIXELS_PER_METER as f64 * phys_pos.y as f64;
         }
     }
 }
@@ -313,11 +322,38 @@ impl PhysicalWorld {
   }
 }
 
-fn make_ball(ents: &mut Entities, phys: &mut PhysicalWorld) {
+fn make_walls(phys: &mut PhysicalWorld) {
+    let half_w = WINDOW_W as f32 / PIXELS_PER_METER as f32 / 2.0;
+    let half_h = WINDOW_H as f32 / PIXELS_PER_METER as f32 / 2.0;
+
+    let p = 1.0f32  / PIXELS_PER_METER as f32;
+
+    // Top
+    let mut rb = RigidBody::new_static(Cuboid::new(Vec2::new(half_w, p)), 0.3, 0.6);
+    rb.append_translation(&Vec2::new(half_w, 0.0));
+    phys.world.add_body(rb);
+
+    // Bottom
+    let mut rb = RigidBody::new_static(Cuboid::new(Vec2::new(half_w, p)), 0.3, 0.6);
+    rb.append_translation(&Vec2::new(half_w, half_h * 2.0));
+    phys.world.add_body(rb);
+
+    // Left
+    let mut rb = RigidBody::new_static(Cuboid::new(Vec2::new(p, half_h)), 0.3, 0.6);
+    rb.append_translation(&Vec2::new(0.0, half_h));
+    phys.world.add_body(rb);
+
+    // Right
+    let mut rb = RigidBody::new_static(Cuboid::new(Vec2::new(p, half_h)), 0.3, 0.6);
+    rb.append_translation(&Vec2::new(half_w * 2.0, half_h));
+    phys.world.add_body(rb);
+}
+
+fn make_ball(ents: &mut Entities, phys: &mut PhysicalWorld, xoff: f64) {
     const BALL_R: f64 = 20.0;
     let shape = Circle(BALL_R);
-    let x = (WINDOW_W - BALL_R) / 2.0;
-    let y = (WINDOW_H - BALL_R) / 2.0;
+    let x = WINDOW_W / 2.0 - BALL_R + xoff;
+    let y = WINDOW_H / 2.0 - BALL_R;
 
     let e = Entity::new()
         .with_shimmer(Shimmer)
@@ -344,11 +380,40 @@ fn make_ball(ents: &mut Entities, phys: &mut PhysicalWorld) {
     let eid = ents.add(e);
 
 
-    let mut rb = RigidBody::new_dynamic(Ball::new(BALL_R as f32), 1.0f32, 0.3, 0.6);
-    rb.append_translation(&Vec2::new(x as f32, y as f32));
+    let br = (BALL_R / PIXELS_PER_METER as f64) as f32;
+    let mut rb = RigidBody::new_dynamic(Ball::new(br), 1.0f32, 0.3, 0.6);
+    rb.append_translation(&Vec2::new((x / PIXELS_PER_METER as f64) as f32 + br, (y / PIXELS_PER_METER as f64) as f32 + br));
 
     let handle = phys.world.add_body(rb);
     phys.bodies.insert(eid, handle);
+    
+
+}
+
+fn make_circle(ents: &mut Entities) {
+    const BALL_R: f64 = WINDOW_H / 2.0;
+    let shape = Circle(BALL_R);
+    let x = WINDOW_W / 2.0 - BALL_R;
+    let y = WINDOW_H / 2.0 - BALL_R;
+
+    let e = Entity::new()
+        .with_position(
+            Position{
+                x: x,
+                y: y
+            })
+        .with_shape(
+            Shape {
+                varient: shape,
+                border: Some(3.0)
+            })
+        .with_color(
+            Color{
+                r: 1.0,
+                g: 0.5,
+                b: 0.2
+            });
+    ents.add(e);
 }
 
 fn make_player(ents: &mut Entities, p1: bool) -> u32 {
@@ -410,7 +475,17 @@ fn main() {
 
     make_player(&mut ents, true);
     make_player(&mut ents, false);
-    make_ball(&mut ents, &mut phys);
+    make_circle(&mut ents);
+    make_ball(&mut ents, &mut phys, 0.0);
+    make_ball(&mut ents, &mut phys, 80.0);
+    make_ball(&mut ents, &mut phys, 160.0);
+    make_ball(&mut ents, &mut phys, 240.0);
+    make_ball(&mut ents, &mut phys, 0.0);
+    make_ball(&mut ents, &mut phys, 85.0);
+    make_ball(&mut ents, &mut phys, 165.0);
+    make_ball(&mut ents, &mut phys, 245.0);
+
+    make_walls(&mut phys);
 
     let event_settings = EventSettings {
         updates_per_second: 120,
