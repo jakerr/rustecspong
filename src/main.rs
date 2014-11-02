@@ -49,6 +49,7 @@ use rustecs::{
 
 static WINDOW_W: f64 = 800.0;
 static WINDOW_H: f64 = 600.0;
+static WINDOW_PADDING: i32 = 20;
 
 fn draw_system(event: &Event,
               gl: &mut Gl,
@@ -58,7 +59,10 @@ fn draw_system(event: &Event,
     if let &Render(args) = event {
         let w = args.width as f64;
         let h = args.height as f64;
-        gl.viewport(0, 0, w as i32, h as i32);
+
+        let pad = WINDOW_PADDING;
+        gl.viewport(pad, pad, w as i32 - 2 * pad, h as i32 - 2 * pad);
+
         let c = Context::abs(w, h);
         // Clear background.
         c.rgb(0.2, 0.2, 0.2).draw(gl);
