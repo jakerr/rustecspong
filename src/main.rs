@@ -9,6 +9,17 @@ extern crate serialize;
 extern crate piston;
 extern crate sdl2_window;
 extern crate opengl_graphics;
+
+extern crate nphysics;
+extern crate "nalgebra" as na;
+extern crate ncollide;
+
+use na::{Vec2, Translation};
+use ncollide::geom::{Ball};
+use nphysics::world::World;
+use nphysics::object::{RigidBody, RigidBodyHandle};
+
+use std::collections::HashMap;
 use std::default::Default;
 use std::rand;
 use std::rand::Rng;
@@ -106,6 +117,27 @@ fn shimmer_system(shimmers: &mut Components<Shimmer>,
         color.r = rng.gen_range(0.5, 1.0);
         color.g = rng.gen_range(0.5, 1.0);
         color.b = rng.gen_range(0.5, 1.0);
+    }
+}
+
+fn phys_system(event: &Event,
+               phys: &mut PhysicalWorld,
+               positions: &mut Components<Position>) {
+    if let &Update(args) = event {
+        let dt = args.dt;
+        phys.world.step(dt as f32);
+        for eid in phys.bodies.keys() {
+          if !positions.contains_key(eid) {
+              continue;
+          }
+          let rb = phys.bodies.find(eid).unwrap().deref().borrow();
+          let transform = rb.transform_ref();
+          let phys_pos = na::translation(transform);
+
+          let position = positions.get_mut(eid);
+          position.x = phys_pos.x as f64;
+          position.y = phys_pos.y as f64;
+        }
     }
 }
 
@@ -263,15 +295,29 @@ world! {
         WindowClamp;
 }
 
-fn make_ball(ents: &mut Entities) {
+type PhysicalBodies = HashMap<u32, RigidBodyHandle>;
+
+struct PhysicalWorld {
+  bodies: PhysicalBodies,
+  world: World
+}
+
+impl PhysicalWorld {
+  fn new() -> PhysicalWorld {
+    let mut p = PhysicalWorld {
+      bodies: HashMap::new(),
+      world: World::new(),
+    };
+    p.world.set_gravity(Vec2::new(0.0f32, 9.81));
+    p
+  }
+}
+
+fn make_ball(ents: &mut Entities, phys: &mut PhysicalWorld) {
     const BALL_R: f64 = 20.0;
     let shape = Circle(BALL_R);
     let x = (WINDOW_W - BALL_R) / 2.0;
     let y = (WINDOW_H - BALL_R) / 2.0;
-
-    let ref mut rng = rand::task_rng();
-    let vx = rng.gen_range(100.0, 200.0) * if rng.gen() { 1.0 } else { -1.0 };
-    let vy = rng.gen_range(-200.0, 200.0);
 
     let e = Entity::new()
         .with_shimmer(Shimmer)
@@ -279,11 +325,6 @@ fn make_ball(ents: &mut Entities) {
             Position{
                 x: x,
                 y: y
-            })
-        .with_velocity(
-            Velocity {
-                x: vx,
-                y: vy
             })
         .with_shape(
             Shape {
@@ -300,7 +341,14 @@ fn make_ball(ents: &mut Entities) {
             WindowClamp {
                varient: Bounce
             });
-    ents.add(e);
+    let eid = ents.add(e);
+
+
+    let mut rb = RigidBody::new_dynamic(Ball::new(BALL_R as f32), 1.0f32, 0.3, 0.6);
+    rb.append_translation(&Vec2::new(x as f32, y as f32));
+
+    let handle = phys.world.add_body(rb);
+    phys.bodies.insert(eid, handle);
 }
 
 fn make_player(ents: &mut Entities, p1: bool) -> u32 {
@@ -357,11 +405,12 @@ fn main() {
     );
 
     let mut gl = Gl::new(opengl);
+    let mut phys = PhysicalWorld::new();
     let mut ents = Entities::new();
 
     make_player(&mut ents, true);
     make_player(&mut ents, false);
-    make_ball(&mut ents);
+    make_ball(&mut ents, &mut phys);
 
     let event_settings = EventSettings {
         updates_per_second: 120,
@@ -377,6 +426,7 @@ fn main() {
                     &mut ents.shapes,
                     &mut ents.window_clamps,
                     &mut ents.velocities);
+        phys_system(&e, &mut phys, &mut ents.positions);
         shimmer_system(&mut ents.shimmers, &mut ents.colors);
         draw_system(&e, &mut gl, &mut ents.positions, &mut ents.shapes, &mut ents.colors);
         for v in to_delete.iter() {
