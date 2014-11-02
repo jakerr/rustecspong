@@ -7,7 +7,7 @@ extern crate rustecs_macros;
 extern crate rustecs;
 extern crate serialize;
 extern crate piston;
-extern crate sdl2_game_window;
+extern crate sdl2_window;
 extern crate opengl_graphics;
 use std::default::Default;
 use std::rand;
@@ -17,7 +17,7 @@ use std::num::abs;
 use opengl_graphics::{
     Gl,
 };
-use sdl2_game_window::WindowSDL2;
+use sdl2_window::Sdl2Window;
 use piston::{
     EventIterator,
     EventSettings,
@@ -37,16 +37,14 @@ use piston::event::{
     Event,
     Render,
     Update,
-    Input,
 };
 use piston::input::{
     keyboard,
     Keyboard,
-    Button,
 };
 use rustecs::{
-    Entities,
     Components,
+    EntityContainer,
 };
 
 static WINDOW_W: f64 = 800.0;
@@ -257,12 +255,11 @@ pub struct Velocity {
 }
 
 world! {
-    World,
     components Position, Shape, Velocity, Color, Shimmer, PlayerController,
         WindowClamp;
 }
 
-fn make_ball(world: &mut World) {
+fn make_ball(ents: &mut Entities) {
     const BALL_R: f64 = 20.0;
     let shape = Circle(BALL_R);
     let x = (WINDOW_W - BALL_R) / 2.0;
@@ -299,10 +296,10 @@ fn make_ball(world: &mut World) {
             WindowClamp {
                varient: Bounce
             });
-    world.add(e);
+    ents.add(e);
 }
 
-fn make_player(world: &mut World, p1: bool) -> u32 {
+fn make_player(ents: &mut Entities, p1: bool) -> u32 {
     const FROM_WALL: f64 = 20.0;
     const PADDLE_W: f64 = 20.0;
     const PADDLE_H: f64 = 150.0;
@@ -339,12 +336,12 @@ fn make_player(world: &mut World, p1: bool) -> u32 {
             WindowClamp {
                varient: Stop
             });
-    world.add(e)
+    ents.add(e)
 }
 
 fn main() {
     let opengl = piston::shader_version::opengl::OpenGL_3_2;
-    let mut window = WindowSDL2::new(
+    let mut window = Sdl2Window::new(
         opengl,
         WindowSettings {
             title: "Pong".to_string(),
@@ -356,11 +353,11 @@ fn main() {
     );
 
     let mut gl = Gl::new(opengl);
-    let mut world = World::new();
+    let mut ents = Entities::new();
 
-    make_player(&mut world, true);
-    make_player(&mut world, false);
-    make_ball(&mut world);
+    make_player(&mut ents, true);
+    make_player(&mut ents, false);
+    make_ball(&mut ents);
 
     let event_settings = EventSettings {
         updates_per_second: 120,
@@ -369,17 +366,17 @@ fn main() {
 
     let mut to_delete: Vec<u32> = vec!();
     for e in EventIterator::new(&mut window, &event_settings) {
-        control_system(&e, &mut world.player_controllers, &mut world.velocities);
+        control_system(&e, &mut ents.player_controllers, &mut ents.velocities);
         move_system(&e,
                     &mut to_delete,
-                    &mut world.positions,
-                    &mut world.shapes,
-                    &mut world.window_clamps,
-                    &mut world.velocities);
-        shimmer_system(&mut world.shimmers, &mut world.colors);
-        draw_system(&e, &mut gl, &mut world.positions, &mut world.shapes, &mut world.colors);
+                    &mut ents.positions,
+                    &mut ents.shapes,
+                    &mut ents.window_clamps,
+                    &mut ents.velocities);
+        shimmer_system(&mut ents.shimmers, &mut ents.colors);
+        draw_system(&e, &mut gl, &mut ents.positions, &mut ents.shapes, &mut ents.colors);
         for v in to_delete.iter() {
-          world.remove(*v);
+          ents.remove(*v);
         }
         to_delete.clear();
     }
