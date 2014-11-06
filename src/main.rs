@@ -16,10 +16,11 @@ extern crate "nalgebra" as na;
 extern crate ncollide;
 
 use na::{Vec2, Translation};
-use ncollide::geom::{Ball, Plane, Cuboid};
+use ncollide::shape::{Ball, Plane, Cuboid};
 use nphysics::world::World;
 use nphysics::object::{RigidBody, RigidBodyHandle};
 
+use std::cell::RefCell;
 use std::collections::HashMap;
 use std::default::Default;
 use std::rand;
@@ -31,8 +32,7 @@ use opengl_graphics::{
 };
 use sdl2_window::Sdl2Window;
 use piston::{
-    EventIterator,
-    EventSettings,
+    Events,
     WindowSettings,
 };
 use graphics::{
@@ -67,7 +67,6 @@ use rustecs::{
 const WINDOW_W: f64 = 800.0;
 const WINDOW_H: f64 = 600.0;
 const WINDOW_PADDING: i32 = 20;
-
 static PIXELS_PER_METER: i32 = 150;
 
 fn draw_system(event: &Event,
@@ -85,7 +84,7 @@ fn draw_system(event: &Event,
         let c = Context::abs(w, h);
         // Clear background.
         c.rgb(0.2, 0.2, 0.2).draw(gl);
-        c.rgb(0.7, 0.7, 0.7).rect(0.0, 0.0, WINDOW_W, WINDOW_H).border_radius(1.0).transform(vecmath::scale(0.5, 0.5)).draw(gl);
+        c.rgb(0.7, 0.7, 0.7).rect(0.0, 0.0, WINDOW_W, WINDOW_H).border_radius(1.0).draw(gl);
 
         let c = Context::abs(w, h);
         for (eid, pos) in positions.iter_mut() {
@@ -468,6 +467,7 @@ fn main() {
             samples: 4,
         }
     );
+    let window = RefCell::new(window);
 
     let mut gl = Gl::new(opengl);
     let mut phys = PhysicalWorld::new();
@@ -487,13 +487,8 @@ fn main() {
 
     make_walls(&mut phys);
 
-    let event_settings = EventSettings {
-        updates_per_second: 120,
-        max_frames_per_second: 60,
-    };
-
     let mut to_delete: Vec<u32> = vec!();
-    for e in EventIterator::new(&mut window, &event_settings) {
+    for e in Events::new(&window) {
         control_system(&e, &mut ents.player_controllers, &mut ents.velocities);
         move_system(&e,
                     &mut to_delete,
