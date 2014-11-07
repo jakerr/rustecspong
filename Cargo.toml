@@ -22,4 +22,4 @@ git = "https://github.com/hannobraun/rustecs"
 
 [dependencies.nphysics]
 git = "https://github.com/sebcrozet/nphysics"
-features = ["2df32"]
+features = ["2df64"]

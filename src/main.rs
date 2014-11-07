@@ -64,10 +64,13 @@ use rustecs::{
     EntityContainer,
 };
 
-const WINDOW_W: f64 = 800.0;
-const WINDOW_H: f64 = 600.0;
-const WINDOW_PADDING: i32 = 20;
-static PIXELS_PER_METER: i32 = 150;
+const WINDOW_W_PIXELS: f64 = 800.0;
+const WINDOW_H_PIXELS: f64 = 600.0;
+const WINDOW_PADDING_PIXELS: i32 = 20;
+
+const PIXELS_PER_METER: f64 = 150.0;
+const WINDOW_W: f64 = WINDOW_W_PIXELS / PIXELS_PER_METER;
+const WINDOW_H: f64 = WINDOW_H_PIXELS / PIXELS_PER_METER;
 
 fn draw_system(event: &Event,
               gl: &mut Gl,
@@ -75,16 +78,16 @@ fn draw_system(event: &Event,
               shapes: &mut Components<Shape>,
               colors: &mut Components<Color>) {
     if let &Render(args) = event {
-        let w = args.width as f64;
-        let h = args.height as f64;
+        let w = args.width as f64 / PIXELS_PER_METER;
+        let h = args.height as f64 / PIXELS_PER_METER;
 
-        let pad = WINDOW_PADDING;
+        let pad = WINDOW_PADDING_PIXELS;
         gl.viewport(pad, pad, w as i32 - 2 * pad, h as i32 - 2 * pad);
 
         let c = Context::abs(w, h);
         // Clear background.
         c.rgb(0.2, 0.2, 0.2).draw(gl);
-        c.rgb(0.7, 0.7, 0.7).rect(0.0, 0.0, WINDOW_W, WINDOW_H).border_radius(1.0).draw(gl);
+        c.rgb(0.7, 0.7, 0.7).rect(0.0, 0.0, w, h).border_radius(1.0 / PIXELS_PER_METER).draw(gl);
 
         let c = Context::abs(w, h);
         for (eid, pos) in positions.iter_mut() {
@@ -99,7 +102,7 @@ fn draw_system(event: &Event,
           } else {
               (1.0, 1.0, 1.0)
           };
-          let drawing = c.rgb(r, g, b).view_transform(vecmath::rotate_radians(1.047));
+          let drawing = c.rgb(r, g, b);
           match (shape, border) {
               (Point, None)    => drawing.rect(1.0, 1.0, w, h).draw(gl),
               (Point, Some(b)) => drawing.rect(1.0, 1.0, w, h).border_radius(b).draw(gl),
@@ -133,7 +136,7 @@ fn phys_system(event: &Event,
                positions: &mut Components<Position>) {
     if let &Update(args) = event {
         let dt = args.dt;
-        phys.world.step(dt as f32);
+        phys.world.step(dt);
         for eid in phys.bodies.keys() {
           if !positions.contains_key(eid) {
               continue;
@@ -143,8 +146,8 @@ fn phys_system(event: &Event,
           let phys_pos = na::translation(transform);
 
           let position = positions.get_mut(eid);
-          position.x = PIXELS_PER_METER as f64 * phys_pos.x as f64;
-          position.y = PIXELS_PER_METER as f64 * phys_pos.y as f64;
+          position.x = phys_pos.x;
+          position.y = phys_pos.y;
         }
     }
 }
@@ -222,7 +225,7 @@ fn control_system(event: &Event,
               controllers: &mut Components<PlayerController>,
               velocities: &mut Components<Velocity>) {
 
-    const PADDLE_V: f64 = 800.0;
+    const PADDLE_V: f64 = 2.0;
 
     for (eid, controller) in controllers.iter_mut() {
         event.press(|button| {
@@ -316,16 +319,16 @@ impl PhysicalWorld {
       bodies: HashMap::new(),
       world: World::new(),
     };
-    p.world.set_gravity(Vec2::new(0.0f32, 9.81));
+    p.world.set_gravity(Vec2::new(0.0f64, 9.81));
     p
   }
 }
 
 fn make_walls(phys: &mut PhysicalWorld) {
-    let half_w = WINDOW_W as f32 / PIXELS_PER_METER as f32 / 2.0;
-    let half_h = WINDOW_H as f32 / PIXELS_PER_METER as f32 / 2.0;
+    let half_w = WINDOW_W / 2.0;
+    let half_h = WINDOW_H / 2.0;
 
-    let p = 1.0f32  / PIXELS_PER_METER as f32;
+    let p = 1.0 / PIXELS_PER_METER;
 
     // Top
     let mut rb = RigidBody::new_static(Cuboid::new(Vec2::new(half_w, p)), 0.3, 0.6);
@@ -334,7 +337,7 @@ fn make_walls(phys: &mut PhysicalWorld) {
 
     // Bottom
     let mut rb = RigidBody::new_static(Cuboid::new(Vec2::new(half_w, p)), 0.3, 0.6);
-    rb.append_translation(&Vec2::new(half_w, half_h * 2.0));
+    rb.append_translation(&Vec2::new(half_w, WINDOW_H));
     phys.world.add_body(rb);
 
     // Left
@@ -344,15 +347,15 @@ fn make_walls(phys: &mut PhysicalWorld) {
 
     // Right
     let mut rb = RigidBody::new_static(Cuboid::new(Vec2::new(p, half_h)), 0.3, 0.6);
-    rb.append_translation(&Vec2::new(half_w * 2.0, half_h));
+    rb.append_translation(&Vec2::new(WINDOW_W, half_h));
     phys.world.add_body(rb);
 }
 
 fn make_ball(ents: &mut Entities, phys: &mut PhysicalWorld, xoff: f64) {
-    const BALL_R: f64 = 20.0;
+    const BALL_R: f64 = 0.1;
     let shape = Circle(BALL_R);
-    let x = WINDOW_W / 2.0 - BALL_R + xoff;
-    let y = WINDOW_H / 2.0 - BALL_R;
+    let x = WINDOW_W / 2.0 + xoff;
+    let y = WINDOW_H / 2.0;
 
     let e = Entity::new()
         .with_shimmer(Shimmer)
@@ -379,21 +382,18 @@ fn make_ball(ents: &mut Entities, phys: &mut PhysicalWorld, xoff: f64) {
     let eid = ents.add(e);
 
 
-    let br = (BALL_R / PIXELS_PER_METER as f64) as f32;
-    let mut rb = RigidBody::new_dynamic(Ball::new(br), 1.0f32, 0.3, 0.6);
-    rb.append_translation(&Vec2::new((x / PIXELS_PER_METER as f64) as f32 + br, (y / PIXELS_PER_METER as f64) as f32 + br));
+    let mut rb = RigidBody::new_dynamic(Ball::new(BALL_R), 1.0f64, 0.3, 0.6);
+    rb.append_translation(&Vec2::new(x, y));
 
     let handle = phys.world.add_body(rb);
     phys.bodies.insert(eid, handle);
-    
-
 }
 
 fn make_circle(ents: &mut Entities) {
     const BALL_R: f64 = WINDOW_H / 2.0;
     let shape = Circle(BALL_R);
-    let x = WINDOW_W / 2.0 - BALL_R;
-    let y = WINDOW_H / 2.0 - BALL_R;
+    let x = WINDOW_W / 2.0;
+    let y = WINDOW_H / 2.0;
 
     let e = Entity::new()
         .with_position(
@@ -404,7 +404,7 @@ fn make_circle(ents: &mut Entities) {
         .with_shape(
             Shape {
                 varient: shape,
-                border: Some(3.0)
+                border: Some(0.01)
             })
         .with_color(
             Color{
@@ -416,9 +416,9 @@ fn make_circle(ents: &mut Entities) {
 }
 
 fn make_player(ents: &mut Entities, p1: bool) -> u32 {
-    const FROM_WALL: f64 = 20.0;
-    const PADDLE_W: f64 = 20.0;
-    const PADDLE_H: f64 = 150.0;
+    const FROM_WALL: f64 = 0.1;
+    const PADDLE_W: f64 = 0.1;
+    const PADDLE_H: f64 = 1.0;
     let x = if p1 {
         FROM_WALL
     } else {
@@ -461,7 +461,7 @@ fn main() {
         opengl,
         WindowSettings {
             title: "Pong".to_string(),
-            size: [WINDOW_W as u32, WINDOW_H as u32],
+            size: [WINDOW_W_PIXELS as u32, WINDOW_H_PIXELS as u32],
             fullscreen: false,
             exit_on_esc: true,
             samples: 4,
@@ -477,13 +477,6 @@ fn main() {
     make_player(&mut ents, false);
     make_circle(&mut ents);
     make_ball(&mut ents, &mut phys, 0.0);
-    make_ball(&mut ents, &mut phys, 80.0);
-    make_ball(&mut ents, &mut phys, 160.0);
-    make_ball(&mut ents, &mut phys, 240.0);
-    make_ball(&mut ents, &mut phys, 0.0);
-    make_ball(&mut ents, &mut phys, 85.0);
-    make_ball(&mut ents, &mut phys, 165.0);
-    make_ball(&mut ents, &mut phys, 245.0);
 
     make_walls(&mut phys);
 
