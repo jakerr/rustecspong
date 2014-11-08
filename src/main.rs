@@ -499,7 +499,7 @@ fn make_player(ents: &mut Entities, p1: bool) -> u32 {
 
 fn main() {
     let opengl = shader_version::opengl::OpenGL_3_2;
-    let mut window = Sdl2Window::new(
+    let window = Sdl2Window::new(
         opengl,
         WindowSettings {
             title: "Pong".to_string(),
