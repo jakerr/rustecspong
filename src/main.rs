@@ -86,6 +86,8 @@ const WINDOW_PADDING_PIXELS: i32 = 20;
 const PIXELS_PER_METER: f64 = 150.0;
 const WINDOW_W: f64 = WINDOW_W_PIXELS / PIXELS_PER_METER;
 const WINDOW_H: f64 = WINDOW_H_PIXELS / PIXELS_PER_METER;
+const PIXEL: f64 = 1.0 / PIXELS_PER_METER;
+
 
 fn draw_system(event: &Event,
               gl: &mut Gl,
@@ -102,7 +104,7 @@ fn draw_system(event: &Event,
         let c = Context::abs(w, h);
         // Clear background.
         c.rgb(0.2, 0.2, 0.2).draw(gl);
-        c.rgb(0.7, 0.7, 0.7).rect(0.0, 0.0, w, h).border_radius(1.0 / PIXELS_PER_METER).draw(gl);
+        c.rgb(0.7, 0.7, 0.7).rect(0.0, 0.0, w, h).border_radius(PIXEL).draw(gl);
 
         let c = Context::abs(w, h);
         for (eid, pos) in positions.iter_mut() {
@@ -119,14 +121,14 @@ fn draw_system(event: &Event,
           };
           let drawing = c.rgb(r, g, b);
           match (shape, border) {
-              (Point, None)    => drawing.rect(1.0, 1.0, w, h).draw(gl),
-              (Point, Some(b)) => drawing.rect(1.0, 1.0, w, h).border_radius(b).draw(gl),
+              (Point, None)    => drawing.rect_centered(pos.x, pos.y, PIXEL, PIXEL).draw(gl),
+              (Point, Some(b)) => drawing.rect_centered(pos.x, pos.y, PIXEL, PIXEL).border_radius(b).draw(gl),
 
               (Circle(rad), None)    => drawing.circle(pos.x, pos.y, rad).draw(gl),
               (Circle(rad), Some(b)) => drawing.circle(pos.x, pos.y, rad).border_radius(b).draw(gl),
 
-              (Square(w,h), None)    => drawing.rect(pos.x, pos.y, w, h).draw(gl),
-              (Square(w,h), Some(b)) => drawing.rect(pos.x, pos.y, w, h).border_radius(b).draw(gl),
+              (Square(w,h), None)    => drawing.rect_centered(pos.x, pos.y, w, h).draw(gl),
+              (Square(w,h), Some(b)) => drawing.rect_centered(pos.x, pos.y, w, h).border_radius(b).draw(gl),
           };
         }
     }
@@ -329,7 +331,7 @@ impl PhysicalWorld {
       bodies: HashMap::new(),
       world: World::new(),
     };
-    p.world.set_gravity(Vec2::new(0.0f64, 9.81));
+    p.world.set_gravity(Vec2::new(0.0f64, 9.86));
     p
   }
 }
@@ -338,25 +340,23 @@ fn make_walls(phys: &mut PhysicalWorld) {
     let half_w = WINDOW_W / 2.0;
     let half_h = WINDOW_H / 2.0;
 
-    let p = 1.0 / PIXELS_PER_METER;
-
     // Top
-    let mut rb = RigidBody::new_static(Cuboid::new(Vec2::new(half_w, p)), 0.3, 0.6);
+    let mut rb = RigidBody::new_static(Cuboid::new(Vec2::new(half_w, PIXEL)), 0.3, 0.6);
     rb.append_translation(&Vec2::new(half_w, 0.0));
     phys.world.add_body(rb);
 
     // Bottom
-    let mut rb = RigidBody::new_static(Cuboid::new(Vec2::new(half_w, p)), 0.3, 0.6);
+    let mut rb = RigidBody::new_static(Cuboid::new(Vec2::new(half_w / 2.0, PIXEL)), 0.3, 0.6);
     rb.append_translation(&Vec2::new(half_w, WINDOW_H));
     phys.world.add_body(rb);
 
     // Left
-    let mut rb = RigidBody::new_static(Cuboid::new(Vec2::new(p, half_h)), 0.3, 0.6);
+    let mut rb = RigidBody::new_static(Cuboid::new(Vec2::new(PIXEL, half_h)), 0.3, 0.6);
     rb.append_translation(&Vec2::new(0.0, half_h));
     phys.world.add_body(rb);
 
     // Right
-    let mut rb = RigidBody::new_static(Cuboid::new(Vec2::new(p, half_h)), 0.3, 0.6);
+    let mut rb = RigidBody::new_static(Cuboid::new(Vec2::new(PIXEL, half_h)), 0.3, 0.6);
     rb.append_translation(&Vec2::new(WINDOW_W, half_h));
     phys.world.add_body(rb);
 }
@@ -384,16 +384,47 @@ fn make_ball(ents: &mut Entities, phys: &mut PhysicalWorld, xoff: f64) {
                 r: 1.0,
                 g: 0.5,
                 b: 0.2
-            })
-        .with_window_clamp(
-            WindowClamp {
-               varient: Bounce
             });
     let eid = ents.add(e);
 
 
     let mut rb = RigidBody::new_dynamic(Ball::new(BALL_R), 1.0f64, 0.3, 0.6);
     rb.append_translation(&Vec2::new(x, y));
+    rb.set_lin_vel(Vec2::new(-0.02f64, -1.0));
+
+    let handle = phys.world.add_body(rb);
+    phys.bodies.insert(eid, handle);
+}
+
+fn make_box(ents: &mut Entities, phys: &mut PhysicalWorld) {
+    const BOX_R: f64 = 0.1;
+    let shape = Square(BOX_R, BOX_R);
+    let x = WINDOW_W / 2.0;
+    let y = WINDOW_H / 2.0;
+
+    let e = Entity::new()
+        .with_position(
+            Position{
+                x: x,
+                y: y
+            })
+        .with_shape(
+            Shape {
+                varient: shape,
+                border: None
+            })
+        .with_color(
+            Color{
+                r: 0.4,
+                g: 0.5,
+                b: 0.2
+            });
+    let eid = ents.add(e);
+
+
+    let mut rb = RigidBody::new_dynamic(Cuboid::new(Vec2::new(BOX_R, BOX_R)), 1.0f64, 0.3, 0.6);
+    rb.append_translation(&Vec2::new(x, y));
+    rb.set_lin_vel(Vec2::new(-0.02f64, -2.0));
 
     let handle = phys.world.add_body(rb);
     phys.bodies.insert(eid, handle);
@@ -426,13 +457,14 @@ fn make_circle(ents: &mut Entities) {
 }
 
 fn make_player(ents: &mut Entities, p1: bool) -> u32 {
-    const FROM_WALL: f64 = 0.1;
     const PADDLE_W: f64 = 0.1;
+    const FROM_WALL: f64 = PADDLE_W * 2.0;
     const PADDLE_H: f64 = 1.0;
+
     let x = if p1 {
         FROM_WALL
     } else {
-        WINDOW_W - FROM_WALL - PADDLE_W
+        WINDOW_W - FROM_WALL
     };
     let y = (WINDOW_H - PADDLE_H) / 2.0;
     let e = Entity::new()
@@ -486,12 +518,21 @@ fn main() {
     make_player(&mut ents, true);
     make_player(&mut ents, false);
     make_circle(&mut ents);
-    make_ball(&mut ents, &mut phys, 0.0);
+    let offset = 0.2f64;
+    for i in range(0u,10) {
+      make_ball(&mut ents, &mut phys, i as f64 * offset);
+    }
 
     make_walls(&mut phys);
 
     let mut to_delete: Vec<u32> = vec!();
+    let mut tick: uint = 0;
     for e in Events::new(&window) {
+        tick += 1;
+        if tick > 100 {
+            tick = 0;
+            make_box(&mut ents, &mut phys);
+        }
         control_system(&e, &mut ents.player_controllers, &mut ents.velocities);
         move_system(&e,
                     &mut to_delete,
