@@ -8,8 +8,14 @@ authors = ["Jake Kerr <kodafox@gmail.com>"]
 
 name = "rustecspong"
 
-[dependencies.piston]
-git = "https://github.com/pistondevelopers/piston"
+[dependencies.input]
+git = "https://github.com/pistondevelopers/input"
+
+[dependencies.event]
+git = "https://github.com/pistondevelopers/event"
+
+[dependencies.shader_version]
+git = "https://github.com/pistondevelopers/shader_version"
 
 [dependencies.sdl2_window]
 git = "https://github.com/pistondevelopers/sdl2_window"

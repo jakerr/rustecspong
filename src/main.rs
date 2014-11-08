@@ -4,19 +4,20 @@
 #[phase(plugin)]
 extern crate rustecs_macros;
 
-extern crate rustecs;
-extern crate serialize;
-extern crate piston;
-extern crate graphics;
-extern crate sdl2_window;
-extern crate opengl_graphics;
-
-extern crate nphysics;
 extern crate "nalgebra" as na;
+extern crate event;
+extern crate graphics;
+extern crate input;
 extern crate ncollide;
+extern crate nphysics;
+extern crate opengl_graphics;
+extern crate rustecs;
+extern crate sdl2_window;
+extern crate serialize;
+extern crate shader_version;
 
 use na::{Vec2, Translation};
-use ncollide::shape::{Ball, Plane, Cuboid};
+use ncollide::shape::{Ball, Cuboid};
 use nphysics::world::World;
 use nphysics::object::{RigidBody, RigidBodyHandle};
 
@@ -31,10 +32,6 @@ use opengl_graphics::{
     Gl,
 };
 use sdl2_window::Sdl2Window;
-use piston::{
-    Events,
-    WindowSettings,
-};
 use graphics::{
     AddBorder,
     AddRectangle,
@@ -43,19 +40,16 @@ use graphics::{
     Context,
     Draw,
 };
-use graphics::vecmath;
-use graphics::can::{
-    CanTransform,
-    CanViewTransform
-};
-use piston::event::{
+use event::{
+    Events,
+    Event,
     PressEvent,
     ReleaseEvent,
-    Event,
     Render,
     Update,
+    WindowSettings,
 };
-use piston::input::{
+use input::{
     keyboard,
     Keyboard,
 };
@@ -63,6 +57,27 @@ use rustecs::{
     Components,
     EntityContainer,
 };
+use ecs::{
+    Entities,
+    Entity,
+};
+
+#[allow(dead_code)]
+mod ecs {
+    use super::{
+        Position,
+        Shape,
+        Velocity,
+        Color,
+        Shimmer,
+        PlayerController,
+        WindowClamp
+    };
+    world! {
+        components Position, Shape, Velocity, Color, Shimmer, PlayerController,
+            WindowClamp;
+    }
+}
 
 const WINDOW_W_PIXELS: f64 = 800.0;
 const WINDOW_H_PIXELS: f64 = 600.0;
@@ -94,11 +109,11 @@ fn draw_system(event: &Event,
           let mut shape = Point;
           let mut border = None;
           if shapes.contains_key(eid) {
-            shape = shapes.get_mut(eid).varient;
-            border = shapes.get_mut(eid).border;
+            shape = shapes[*eid].varient;
+            border = shapes[*eid].border;
           }
           let (r, g, b) = if colors.contains_key(eid) {
-              (colors.get_mut(eid).r, colors.get_mut(eid).g, colors.get_mut(eid).b)
+              (colors[*eid].r, colors[*eid].g, colors[*eid].b)
           } else {
               (1.0, 1.0, 1.0)
           };
@@ -123,7 +138,7 @@ fn shimmer_system(shimmers: &mut Components<Shimmer>,
         if !colors.contains_key(eid) {
             continue;
         }
-        let color = colors.get_mut(eid);
+        let color = &mut colors[*eid];
         let ref mut rng = rand::task_rng();
         color.r = rng.gen_range(0.5, 1.0);
         color.g = rng.gen_range(0.5, 1.0);
@@ -141,11 +156,11 @@ fn phys_system(event: &Event,
           if !positions.contains_key(eid) {
               continue;
           }
-          let rb = phys.bodies.find(eid).unwrap().deref().borrow();
+          let rb = phys.bodies.get(eid).unwrap().deref().borrow();
           let transform = rb.transform_ref();
           let phys_pos = na::translation(transform);
 
-          let position = positions.get_mut(eid);
+          let position = &mut positions[*eid];
           position.x = phys_pos.x;
           position.y = phys_pos.y;
         }
@@ -166,14 +181,14 @@ fn move_system(event: &Event,
             }
 
             // If we have both a position and a velocity, integrate.
-            let velocity = velocities.get_mut(eid);
+            let velocity = &mut velocities[*eid];
             position.x += velocity.x * dt;
             position.y += velocity.y * dt;
 
             if !clamps.contains_key(eid) {
               continue;
             }
-            let (w, h) = match shapes.find(eid) {
+            let (w, h) = match shapes.get(eid) {
                 Some(&s) =>
                   match s.varient {
                     Circle(r) => (r, r),
@@ -183,7 +198,7 @@ fn move_system(event: &Event,
                 None => (0.0, 0.0)
             };
 
-            let clamp = clamps.get_mut(eid);
+            let clamp = clamps[*eid];
             let velocity_mult = match clamp.varient {
               Bounce => -1.0,
               Stop => 0.0,
@@ -230,15 +245,15 @@ fn control_system(event: &Event,
     for (eid, controller) in controllers.iter_mut() {
         event.press(|button| {
             if button == Keyboard(controller.up) {
-                velocities.get_mut(eid).y = -PADDLE_V;
+                velocities[*eid].y = -PADDLE_V;
             } else if button == Keyboard(controller.down) {
-                velocities.get_mut(eid).y = PADDLE_V;
+                velocities[*eid].y = PADDLE_V;
             }
         });
         event.release(|button| {
             if button == Keyboard(controller.up)
             || button == Keyboard(controller.down) {
-                velocities.get_mut(eid).y = 0.0;
+                velocities[*eid].y = 0.0;
             }
         });
     }
@@ -299,11 +314,6 @@ pub struct Shape {
 pub struct Velocity {
     x: f64,
     y: f64
-}
-
-world! {
-    components Position, Shape, Velocity, Color, Shimmer, PlayerController,
-        WindowClamp;
 }
 
 type PhysicalBodies = HashMap<u32, RigidBodyHandle>;
@@ -456,7 +466,7 @@ fn make_player(ents: &mut Entities, p1: bool) -> u32 {
 }
 
 fn main() {
-    let opengl = piston::shader_version::opengl::OpenGL_3_2;
+    let opengl = shader_version::opengl::OpenGL_3_2;
     let mut window = Sdl2Window::new(
         opengl,
         WindowSettings {
