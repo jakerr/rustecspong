@@ -263,35 +263,29 @@ fn make_ball(world: &mut World<Components, Systems>) {
     let x = (WINDOW_W - BALL_R) / 2.0;
     let y = (WINDOW_H - BALL_R) / 2.0;
 
-    let entity = world.create_entity(Box::new(
-        |entity: BuildData, data: &mut Components| {
+    let entity = world.create_entity(Box::new(|entity: BuildData, data: &mut Components| {
         data.position.add(&entity,
             Position{
                 x: x,
                 y: y
-            });
+        });
         data.shimmer.add(&entity, Shimmer);
         data.shape.add(&entity,
             Shape {
-                varient: ShapeVarient::Circle(BALL_R)
+                varient: ShapeVarient::Circle(BALL_R),
                 border: None
-            });
-        }
-    ));
-
-//    let e = world.create_entity(Box::new(
-//            |entity: BuildData, data: &mut Components| {
-//        data.color.add(&entity,
-//            Color{
-//                r: 1.0,
-//                g: 0.5,
-//                b: 0.2
-//            });
-//        data.window_clamp.add(&entity,
-//            WindowClamp {
-//               varient: ClampVarient::Bounce
-//            });
-//    }) as Box<EntityBuilder<Components>>);
+        });
+        data.color.add(&entity,
+            Color{
+                r: 1.0,
+                g: 0.5,
+                b: 0.2
+        });
+        data.window_clamp.add(&entity,
+            WindowClamp {
+               varient: ClampVarient::Bounce
+        });
+    }));
 }
 
 //fn make_player(ents: &mut Entities, p1: bool) -> u32 {
@@ -336,7 +330,7 @@ fn make_ball(world: &mut World<Components, Systems>) {
 
 fn main() {
     let opengl = shader_version::OpenGL::_3_2;
-    let mut window = Sdl2Window::new(
+    let window = Sdl2Window::new(
         opengl,
         WindowSettings {
             title: "Pong".to_string(),
