@@ -3,6 +3,7 @@
 #[macro_use]
 extern crate ecs;
 use ecs::*;
+use ecs::system::{EntityProcess, EntitySystem};
 
 extern crate shader_version;
 extern crate input;
@@ -17,9 +18,11 @@ use window::WindowSettings;
 
 use std::collections::HashMap;
 use std::default::Default;
+use std::rand;
 use std::rand::Rng;
-use event::{Event, ReleaseEvent, UpdateEvent, PressEvent, RenderEvent};
+use event::{Event, ReleaseEvent, UpdateEvent, PressEvent, RenderEvent, RenderArgs};
 use quack::Set;
+use std::cell::RefCell;
 
 use opengl_graphics::{
     Gl,
@@ -29,6 +32,76 @@ use sdl2_window::Sdl2Window;
 static WINDOW_W: f64 = 800.0;
 static WINDOW_H: f64 = 600.0;
 static WINDOW_PADDING: i32 = 20;
+
+pub struct ShimmerSystem;
+
+impl System for ShimmerSystem {
+    type Components = Components;
+}
+
+pub struct DrawSystem {
+    gl: Option<RefCell<Gl>>,
+    args: Option<RefCell<RenderArgs>>
+}
+
+impl EntityProcess for ShimmerSystem {
+    fn process(&mut self, entities: EntityIter<Components>, data: &mut DataHelper<Components>) {
+        for e in entities {
+            let color = &mut data.colors[e];
+            let ref mut rng = rand::thread_rng();
+            color.r = rng.gen_range(0.5, 1.0);
+            color.g = rng.gen_range(0.5, 1.0);
+            color.b = rng.gen_range(0.5, 1.0);
+        }
+    }
+}
+
+impl System for DrawSystem {
+    type Components = Components;
+    fn is_active(&self) -> bool { false }
+}
+
+impl EntityProcess for DrawSystem {
+    fn process(&mut self, entities: EntityIter<Components>, data: &mut DataHelper<Components>) {
+        use graphics::*;
+        use ShapeVarient::*;
+        for e in entities {
+            let position = &data.positions[e];
+            let shape = &data.shapes[e];
+            let color = &data.colors[e];
+            let pad = WINDOW_PADDING;
+            if let Some(ref gl_cell) = self.gl {
+            if let Some(ref arg_cell) = self.args {
+                let mut gl = gl_cell.borrow_mut();
+                let mut args = arg_cell.borrow();
+                gl.draw([pad, pad, args.width as i32 - 2 * pad, args.height as i32 - 2 * pad], |c, gl| { // viewport
+                    graphics::clear([0.2, 0.2, 0.2, 1.0], gl);
+                    let r = Rectangle::new([0.0, 0.0, 0.0, 1.0]);
+                    r.draw([0.0, 0.0, WINDOW_W, WINDOW_H], &c, gl);
+                    match shape.varient {
+                        Circle(rad) => {
+                            Ellipse::new([color.r, color.g, color.b, 1.0])
+                                .draw([
+                                      position.x,
+                                      position.y,
+                                      rad, rad
+                                ], &c, gl);
+                        },
+                        Point | _ => {
+                            Rectangle::new([color.r, color.g, color.b, 1.0])
+                                .draw([
+                                      position.x,
+                                      position.y,
+                                      1.0f64, 1.0f64
+                                ], &c, gl);
+                        },
+                    };
+                });
+            } //gl cell
+            } // arg cell
+        }
+    }
+}
 
 //fn draw_system(event: &Event,
 //              gl: &mut Gl,
@@ -75,20 +148,6 @@ static WINDOW_PADDING: i32 = 20;
 ////              (Square(w,h), Some(b)) => drawing.rect(pos.x, pos.y, w, h).border_radius(b).draw(gl),
 ////          };
 ////        }
-//    }
-//}
-
-//fn shimmer_system(shimmers: &mut Components<Shimmer>,
-//                 colors: &mut Components<Color>) {
-//    for (eid, _) in shimmers.iter_mut() {
-//        if !colors.contains_key(eid) {
-//            continue;
-//        }
-//        let color = colors.get_mut(eid);
-//        let ref mut rng = rand::thread_rng();
-//        color.r = rng.gen_range(0.5, 1.0);
-//        color.g = rng.gen_range(0.5, 1.0);
-//        color.b = rng.gen_range(0.5, 1.0);
 //    }
 //}
 //
@@ -244,18 +303,27 @@ pub struct Velocity {
 
 components! {
     Components {
-        #[hot] position: Position,
-        #[hot] shape: Shape,
-        #[hot] velocity: Velocity,
-        #[hot] color: Color,
-        #[hot] shimmer: Shimmer,
-        #[hot] player_controller: PlayerController,
-        #[hot] window_clamp: WindowClamp
+        #[hot] positions: Position,
+        #[hot] shapes: Shape,
+        #[hot] velocities: Velocity,
+        #[hot] colors: Color,
+        #[hot] shimmers: Shimmer,
+        #[hot] player_controllers: PlayerController,
+        #[hot] window_clamps: WindowClamp
     }
 }
 
 systems! {
-    Systems<Components>;
+    Systems<Components> {
+        shimmer: EntitySystem<ShimmerSystem> = EntitySystem::new(
+            ShimmerSystem,
+            aspect!(<Components> all: [colors])
+        ),
+        draw: EntitySystem<DrawSystem> = EntitySystem::new(
+            DrawSystem{ gl: None, args: None },
+            aspect!(<Components> all: [positions, shapes, colors])
+        )
+    }
 }
 
 fn make_ball(world: &mut World<Components, Systems>) {
@@ -264,24 +332,24 @@ fn make_ball(world: &mut World<Components, Systems>) {
     let y = (WINDOW_H - BALL_R) / 2.0;
 
     let entity = world.create_entity(Box::new(|entity: BuildData, data: &mut Components| {
-        data.position.add(&entity,
+        data.positions.add(&entity,
             Position{
                 x: x,
                 y: y
         });
-        data.shimmer.add(&entity, Shimmer);
-        data.shape.add(&entity,
+        data.shimmers.add(&entity, Shimmer);
+        data.shapes.add(&entity,
             Shape {
                 varient: ShapeVarient::Circle(BALL_R),
                 border: None
         });
-        data.color.add(&entity,
+        data.colors.add(&entity,
             Color{
                 r: 1.0,
                 g: 0.5,
                 b: 0.2
         });
-        data.window_clamp.add(&entity,
+        data.window_clamps.add(&entity,
             WindowClamp {
                varient: ClampVarient::Bounce
         });
@@ -344,16 +412,20 @@ fn main() {
     let mut gl = Gl::new(opengl);
 
     let mut world = World::<Components, Systems>::new();
+    world.systems.draw.gl = Some(RefCell::new(gl));
     make_ball(&mut world);
 
     for e in event::events(window) {
         use event::{ ReleaseEvent, UpdateEvent, PressEvent, RenderEvent };
 
         if let Some(args) = e.update_args() {
-            //(args.dt as f32);
+            world.update();
         }
         if let Some(args) = e.render_args() {
-            use graphics::*;
+            world.systems.draw.args = Some(RefCell::new(args));
+            process!(world, draw);
+            //(args.dt as f32);
+//            use graphics::*;
 //            gl.draw([0, 0, args.width as i32, args.height as i32], |c, gl| {
 //                graphics::clear([0.0, 0.0, 0.0, 1.0], gl);
 //                let r = Rectangle::new([1.0, 1.0, 1.0, 1.0]);
