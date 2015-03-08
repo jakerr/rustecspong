@@ -260,6 +260,7 @@ systems! {
 
 fn make_ball(world: &mut World<Components, Systems>) {
     const BALL_R: f64 = 20.0;
+    let shape = ShapeVarient::Circle(BALL_R);
     let x = (WINDOW_W - BALL_R) / 2.0;
     let y = (WINDOW_H - BALL_R) / 2.0;
 
@@ -273,7 +274,7 @@ fn make_ball(world: &mut World<Components, Systems>) {
         data.shimmer.add(&entity, Shimmer);
         data.shape.add(&entity,
             Shape {
-                varient: ShapeVarient::Circle(BALL_R)
+                varient: shape,
                 border: None
             });
         }
