@@ -25,15 +25,18 @@ use quack::Set;
 use std::cell::RefCell;
 use std::cell::Cell;
 use std::rc::Rc;
+use input::keyboard;
 
 use opengl_graphics::{
     Gl,
 };
 use sdl2_window::Sdl2Window;
 
-static WINDOW_W: f64 = 800.0;
-static WINDOW_H: f64 = 600.0;
-static WINDOW_PADDING: i32 = 20;
+const WINDOW_W: f64 = 800.0;
+const WINDOW_H: f64 = 600.0;
+const WINDOW_PADDING: f64 = 20.0;
+const VIEW_W: f64 = (WINDOW_W - 2.0 * WINDOW_PADDING);
+const VIEW_H: f64 = (WINDOW_H - 2.0 * WINDOW_PADDING);
 
 pub struct Meta {
     render: Cell<RenderArgs>,
@@ -72,23 +75,23 @@ impl EntityProcess for DrawSystem {
     fn process(&mut self, entities: EntityIter<Components>, data: &mut DataHelper<Components>) {
         use graphics::*;
         use ShapeVarient::*;
-        for e in entities {
-            let position = &data.positions[e];
-            let shape = &data.shapes[e];
-            let color = &data.colors[e];
-            let pad = WINDOW_PADDING;
-            if let Some(ref gl_cell) = self.gl {
-            if let Some(ref meta) = self.meta {
-                let mut gl = gl_cell.borrow_mut();
-                let render = meta.render.get();
-                let view_width = (render.width as i32 - 2 * pad) as f64;
-                let view_height = (render.height as i32 - 2 * pad) as f64;
-                gl.draw([pad, pad, view_width as i32, view_height as i32], |c, gl| { // viewport
-                    graphics::clear([0.2, 0.2, 0.2, 1.0], gl);
-                    let r = Rectangle::new([0.0, 1.0, 0.0, 1.0]);
-                    r.draw([0.0, 0.0, view_width, view_height], &c, gl);
-                    let r = Rectangle::new([0.0, 0.0, 0.0, 1.0]);
-                    r.draw([1.0, 1.0, view_width - 2.0,  view_height - 2.0], &c, gl);
+        let pad = WINDOW_PADDING;
+        if let Some(ref gl_cell) = self.gl {
+        if let Some(ref meta) = self.meta {
+            let mut gl = gl_cell.borrow_mut();
+            let render = meta.render.get();
+            let view_width = render.width as f64 - 2.0 * pad;
+            let view_height = render.height as f64 - 2.0 * pad;
+            gl.draw([pad as i32, pad as i32, view_width as i32, view_height as i32], |c, gl| { // viewport
+                graphics::clear([0.2, 0.2, 0.2, 1.0], gl);
+                let r = Rectangle::new([0.0, 1.0, 0.0, 1.0]);
+                r.draw([0.0, 0.0, view_width, view_height], &c, gl);
+                let r = Rectangle::new([0.0, 0.0, 0.0, 1.0]);
+                r.draw([1.0, 1.0, view_width - 2.0,  view_height - 2.0], &c, gl);
+                for e in entities {
+                    let position = &data.positions[e];
+                    let shape = &data.shapes[e];
+                    let color = &data.colors[e];
                     match shape.varient {
                         Circle(rad) => {
                             Ellipse::new([color.r, color.g, color.b, 1.0])
@@ -98,19 +101,27 @@ impl EntityProcess for DrawSystem {
                                       2.0*rad, 2.0*rad
                                 ], &c, gl);
                         },
-                        Point | _ => {
+                        Square(w, h) => {
+                            Rectangle::new([color.r, color.g, color.b, 1.0])
+                                .draw([
+                                      position.x,
+                                      position.y,
+                                      w, h
+                                ], &c, gl);
+                        },
+                        Point => {
                             Rectangle::new([color.r, color.g, color.b, 1.0])
                                 .draw([
                                       position.x,
                                       position.y,
                                       1.0f64, 1.0f64
                                 ], &c, gl);
-                        },
-                    };
-                });
-            } //gl cell
-            } // meta
-        }
+                        }
+                    }
+                }
+            });
+        } //gl cell
+        } // meta
     }
 }
 
@@ -137,8 +148,8 @@ impl EntityProcess for MoveSystem {
             if let Some(ref meta) = self.meta {
                 let dt = meta.update.get().dt;
                 let render = meta.render.get();
-                let view_width = (render.width as i32 - 2 * WINDOW_PADDING) as f64;
-                let view_height = (render.height as i32 - 2 * WINDOW_PADDING) as f64;
+                let view_width = render.width as f64 - 2.0 * WINDOW_PADDING;
+                let view_height = render.height as f64 - 2.0 * WINDOW_PADDING;
 
                 let (px, py) = {
                     let position = &mut(data.positions[e]);
@@ -245,8 +256,8 @@ pub struct WindowClamp {
 
 #[derive(Clone, PartialEq, Debug)]
 pub struct PlayerController {
-    up: input::Button,
-    down: input::Button
+    up: keyboard::Key,
+    down: keyboard::Key
 }
 
 #[derive(Clone, PartialEq, Debug)]
@@ -303,7 +314,7 @@ components! {
 systems! {
     Systems<Components> {
         shimmer: EntitySystem<ShimmerSystem> = EntitySystem::new( ShimmerSystem,
-            aspect!(<Components> all: [colors])
+            aspect!(<Components> all: [colors, shimmers])
         ),
         moves: EntitySystem<MoveSystem> = EntitySystem::new(
             MoveSystem{ meta: None },
@@ -318,8 +329,8 @@ systems! {
 
 fn make_ball(world: &mut World<Components, Systems>) {
     const BALL_R: f64 = 20.0;
-    let x = (WINDOW_W - BALL_R) / 2.0;
-    let y = (WINDOW_H - BALL_R) / 2.0;
+    let x = (VIEW_W - BALL_R) / 2.0;
+    let y = (VIEW_H - BALL_R) / 2.0;
 
     let entity = world.create_entity(|entity: BuildData, data: &mut Components| {
         data.positions.add(&entity,
@@ -351,45 +362,40 @@ fn make_ball(world: &mut World<Components, Systems>) {
     });
 }
 
-//fn make_player(ents: &mut Entities, p1: bool) -> u32 {
-//    const FROM_WALL: f64 = 20.0;
-//    const PADDLE_W: f64 = 20.0;
-//    const PADDLE_H: f64 = 150.0;
-//    let x = if p1 {
-//        FROM_WALL
-//    } else {
-//        WINDOW_W - FROM_WALL - PADDLE_W
-//    };
-//    let y = (WINDOW_H - PADDLE_H) / 2.0;
-//    let e = Entity::new()
-//        .with_player_controller(
-//            PlayerController {
-//                up: if p1 { keyboard::W } else { keyboard::I },
-//                down: if p1 { keyboard::S } else { keyboard::K }
-//            })
-//        .with_velocity(Velocity { x: 0.0, y: 0.0 } )
-//        .with_position(
-//            Position{
-//                x: x,
-//                y: y
-//            })
-//        .with_shape(
-//            Shape {
-//                varient: Square(PADDLE_W, PADDLE_H),
-//                border: None
-//            })
-//        .with_color(
-//            Color{
-//                r: 0.5,
-//                g: 0.2,
-//                b: 0.8
-//            })
-//        .with_window_clamp(
-//            WindowClamp {
-//               varient: Stop
-//            });
-//    ents.add(e)
-//}
+fn make_player(world: &mut World<Components, Systems>, p1: bool) {
+    const FROM_WALL: f64 = 40.0;
+    const PADDLE_W: f64 = 20.0;
+    const PADDLE_H: f64 = 150.0;
+    let x = if p1 {
+        FROM_WALL
+    } else {
+        VIEW_W - FROM_WALL - PADDLE_W
+    };
+    let y = (VIEW_H - PADDLE_H) / 2.0;
+    let entity = world.create_entity(|entity: BuildData, data: &mut Components| {
+        data.positions.add(&entity,
+            Position{
+                x: x,
+                y: y
+        });
+        data.shapes.add(&entity,
+            Shape {
+                varient: ShapeVarient::Square(PADDLE_W, PADDLE_H),
+                border: None
+        });
+        data.colors.add(&entity,
+            Color{
+                r: 1.0,
+                g: 0.5,
+                b: 1.0
+        });
+        data.player_controllers.add(&entity,
+            PlayerController {
+                up: if p1 { keyboard::Key::W } else { keyboard::Key::I },
+                down: if p1 { keyboard::Key::S } else { keyboard::Key::K },
+        });
+    });
+}
 
 fn main() {
     let opengl = shader_version::OpenGL::_3_2;
@@ -409,6 +415,8 @@ fn main() {
     let mut world = World::<Components, Systems>::new();
     world.systems.draw.gl = Some(RefCell::new(gl));
     make_ball(&mut world);
+    make_player(&mut world, true);
+    make_player(&mut world, false);
     let mut meta = Rc::new(Meta {
         render: Cell::new(RenderArgs { ext_dt: 0.0, width: 0, height: 0 }),
         update: Cell::new(UpdateArgs { dt: 0.0 })
@@ -427,26 +435,6 @@ fn main() {
         if let Some(args) = e.render_args() {
             meta.render.set(args);
             process!(world, draw);
-            //(args.dt as f32);
-//            use graphics::*;
-//            gl.draw([0, 0, args.width as i32, args.height as i32], |c, gl| {
-//                graphics::clear([0.0, 0.0, 0.0, 1.0], gl);
-//                let r = Rectangle::new([1.0, 1.0, 1.0, 1.0]);
-//                let off = Color([0.0, 0.0, 0.0, 1.0]);
-//                let on = Color([1.0, 1.0, 1.0, 1.0]);
-//
-//                let w = args.width as f64 / 64.0;
-//                let h = args.height as f64 / 32.0;
-//
-//                for (y,row) in vm.screen_rows().enumerate() {
-//                    for (x,byte) in row.iter().enumerate() {
-//                        let x = x as f64 * w;
-//                        let y = y as f64 * h;
-//                        r.set(match *byte { 0 => off, _ => on })
-//                        .draw([x, y, w, h], &c, gl);
-//                    }
-//                }
-//            });
         }
     }
 }
