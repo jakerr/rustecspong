@@ -42,16 +42,15 @@ pub struct ShimmerSystem;
 
 impl System for ShimmerSystem {
     type Components = Components;
-    type Services = ();
+    type Services = Services;
 }
 
 pub struct DrawSystem {
     gl: Option<RefCell<Gl>>,
-    event: Option<RefCell<Event>>
 }
 
 impl EntityProcess for ShimmerSystem {
-    fn process(&mut self, entities: EntityIter<Components>, data: &mut DataHelper<Components, ()>) {
+    fn process(&mut self, entities: EntityIter<Components>, data: &mut DataHelper<Components, Services>) {
         for e in entities {
             let color = &mut data.colors[e];
             let ref mut rng = rand::thread_rng();
@@ -64,19 +63,18 @@ impl EntityProcess for ShimmerSystem {
 
 impl System for DrawSystem {
     type Components = Components;
-    type Services = ();
-    fn is_active(&self) -> bool { false }
+    type Services = Services;
 }
 
 impl EntityProcess for DrawSystem {
-    fn process(&mut self, entities: EntityIter<Components>, data: &mut DataHelper<Components, ()>) {
+    fn process(&mut self, entities: EntityIter<Components>, data: &mut DataHelper<Components, Services>) {
         use graphics::*;
         use ShapeVarient::*;
         let pad = WINDOW_PADDING;
-        if let (Some(ref gl_cell), Some(ref event)) = (self.gl, self.event) {
+        if let Some(ref gl_cell) = self.gl {
             let mut gl = gl_cell.borrow_mut();
-            let e = event.borrow();
-            if let Some(render) = e.render_args() {
+            let event = data.services.event.borrow();
+            if let Some(render) = event.render_args() {
                 let view_width = render.width as f64 - 2.0 * pad;
                 let view_height = render.height as f64 - 2.0 * pad;
                 gl.draw([pad as i32, pad as i32, view_width as i32, view_height as i32], |c, gl| { // viewport
@@ -132,17 +130,15 @@ impl EntityProcess for DrawSystem {
     }
 }
 
-pub struct MoveSystem {
-    event: Option<RefCell<Event>>
-}
+pub struct MoveSystem;
 
 impl System for MoveSystem {
     type Components = Components;
-    type Services = ();
+    type Services = Services;
 }
 
 impl EntityProcess for MoveSystem {
-    fn process(&mut self, entities: EntityIter<Components>, data: &mut DataHelper<Components, ()>) {
+    fn process(&mut self, entities: EntityIter<Components>, data: &mut DataHelper<Components, Services>) {
         use graphics::*;
         use ShapeVarient::*;
         use ClampVarient::*;
@@ -153,9 +149,9 @@ impl EntityProcess for MoveSystem {
             };
             let shape = data.shapes[e].clone();
             let clamp = data.clamps[e].clone();
-            if let Some(ref event) = self.event {
-                let e = event.borrow();
-                if let Some(update) = e.update_args() {
+            let event = data.services.event.clone();
+            let event =  event.borrow();
+                if let Some(update) = event.update_args() {
                     let dt = update.dt;
                     let view_width = WINDOW_W as f64 - 2.0 * WINDOW_PADDING;
                     let view_height = WINDOW_H as f64 - 2.0 * WINDOW_PADDING;
@@ -222,49 +218,51 @@ impl EntityProcess for MoveSystem {
                             println!("Should remove, went off vertical edge");
                         }
                       }
-                    }
                 }
             }
         }
     }
 }
 
-pub struct ControlSystem {
-    event: Option<RefCell<Event>>
-}
+pub struct ControlSystem;
 
 impl System for ControlSystem {
     type Components = Components;
-    type Services = ();
+    type Services = Services;
 }
 
 impl EntityProcess for ControlSystem {
-    fn process(&mut self, entities: EntityIter<Components>, data: &mut DataHelper<Components, ()>) {
+    fn process(&mut self, entities: EntityIter<Components>, data: &mut DataHelper<Components, Services>) {
+        use input::Button::Keyboard;
         const PADDLE_V: f64 = 800.0;
+        for e in entities {
+            let (vx, vy) = {
+                let v = &data.velocities[e];
+                (v.x, v.y)
+            };
+            let event = data.services.event.clone();
+            let event =  event.borrow();
+            let (up, down) = {
+                let controller  = &(data.player_controllers[e]);
+                (Keyboard(controller.up), Keyboard(controller.down))
+            };
+            let velocity = &mut(data.velocities[e]);
+            event.press(|button| {
+                if button == up {
+                    velocity.y = -PADDLE_V;
+                } else if button == down {
+                    velocity.y = PADDLE_V;
+                }
+            });
+            event.release(|button| {
+                if button == up
+                || button == down {
+                    velocity.y = 0.0;
+                }
+            });
+        }
     }
 }
-
-//fn control_system(event: &Event,
-//              controllers: &mut Components<PlayerController>,
-//              velocities: &mut Components<Velocity>) {
-//
-//
-//    for (eid, controller) in controllers.iter_mut() {
-//        event.press(|button| {
-//            if button == Keyboard(controller.up) {
-//                velocities.get_mut(eid).y = -PADDLE_V;
-//            } else if button == Keyboard(controller.down) {
-//                velocities.get_mut(eid).y = PADDLE_V;
-//            }
-//        });
-//        event.release(|button| {
-//            if button == Keyboard(controller.up)
-//            || button == Keyboard(controller.down) {
-//                velocities.get_mut(eid).y = 0.0;
-//            }
-//        });
-//    }
-//}
 
 #[derive(Clone, PartialEq, Debug)]
 pub enum ClampVarient {
@@ -336,18 +334,29 @@ components! {
 }
 
 systems! {
-    Systems<Components, ()> {
+    Systems<Components, Services> {
         shimmer: EntitySystem<ShimmerSystem> = EntitySystem::new( ShimmerSystem,
             aspect!(<Components> all: [colors, shimmers])
         ),
+        control: EntitySystem<ControlSystem> = EntitySystem::new(
+            ControlSystem,
+            aspect!(<Components> all: [player_controllers, velocities])
+        ),
         moves: EntitySystem<MoveSystem> = EntitySystem::new(
-            MoveSystem{ event: None },
+            MoveSystem,
             aspect!(<Components> all: [positions, shapes, velocities, clamps])
         ),
         draw: EntitySystem<DrawSystem> = EntitySystem::new(
-            DrawSystem{ gl: None, event: None },
+            DrawSystem{ gl: None },
             aspect!(<Components> all: [positions, shapes, colors])
         )
+    }
+}
+
+services! {
+    Services {
+        event: RefCell<Event> =
+            RefCell::new(Event::Update(UpdateArgs { dt: 3.14 }))
     }
 }
 
@@ -402,6 +411,11 @@ fn make_player(world: &mut World<Systems>, p1: bool) {
                 x: x,
                 y: y
         });
+        data.velocities.add(&entity,
+            Velocity{
+                x: 0.0,
+                y: 0.0,
+        });
         data.shapes.add(&entity,
             Shape {
                 varient: ShapeVarient::Square(PADDLE_W, PADDLE_H),
@@ -417,6 +431,10 @@ fn make_player(world: &mut World<Systems>, p1: bool) {
             PlayerController {
                 up: if p1 { keyboard::Key::W } else { keyboard::Key::I },
                 down: if p1 { keyboard::Key::S } else { keyboard::Key::K },
+        });
+        data.clamps.add(&entity,
+            WindowClamp {
+               varient: ClampVarient::Stop
         });
     });
 }
@@ -441,31 +459,10 @@ fn main() {
     make_ball(&mut world);
     make_player(&mut world, true);
     make_player(&mut world, false);
-    let mut event_cell = RefCell::new(Event::Update(UpdateArgs { dt: 0.0 }));
-
-    world.systems.moves.event = Some(event_cell.clone());
-    world.systems.draw.event = Some(event_cell.clone());
 
     for e in event::events(window) {
-        use event::{ ReleaseEvent, UpdateEvent, PressEvent, RenderEvent };
-        *(event_cell.as_unsafe_cell().get()) = e;
+        use event::{ ReleaseEvent, UpdateEvent, PressEvent, RenderEvent};
+        *(world.data.services.event.borrow_mut()) = e;
         world.update();
-//
-//        if let Some(args) = e.update_args() {
-//            meta.update.set(e);
-//            world.update();
-//        }
-//        if let Some(args) = e.render_args() {
-//            meta.render.set(args);
-//            process!(world, draw);
-//        }
-//        if let Some(args) = e.press_args() {
-//            meta.press.set(args);
-//            process!(world, draw);
-//        }
-//        if let Some(args) = e.release_args() {
-//            meta.release.set(args);
-//            process!(world, draw);
-//        }
     }
 }
