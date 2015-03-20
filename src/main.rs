@@ -38,24 +38,20 @@ const WINDOW_PADDING: f64 = 20.0;
 const VIEW_W: f64 = (WINDOW_W - 2.0 * WINDOW_PADDING);
 const VIEW_H: f64 = (WINDOW_H - 2.0 * WINDOW_PADDING);
 
-pub struct Meta {
-    render: Cell<RenderArgs>,
-    update: Cell<UpdateArgs>
-}
-
 pub struct ShimmerSystem;
 
 impl System for ShimmerSystem {
     type Components = Components;
+    type Services = ();
 }
 
 pub struct DrawSystem {
     gl: Option<RefCell<Gl>>,
-    meta: Option<Rc<Meta>>
+    event: Option<RefCell<Event>>
 }
 
 impl EntityProcess for ShimmerSystem {
-    fn process(&mut self, entities: EntityIter<Components>, data: &mut DataHelper<Components>) {
+    fn process(&mut self, entities: EntityIter<Components>, data: &mut DataHelper<Components, ()>) {
         for e in entities {
             let color = &mut data.colors[e];
             let ref mut rng = rand::thread_rng();
@@ -68,73 +64,85 @@ impl EntityProcess for ShimmerSystem {
 
 impl System for DrawSystem {
     type Components = Components;
+    type Services = ();
     fn is_active(&self) -> bool { false }
 }
 
 impl EntityProcess for DrawSystem {
-    fn process(&mut self, entities: EntityIter<Components>, data: &mut DataHelper<Components>) {
+    fn process(&mut self, entities: EntityIter<Components>, data: &mut DataHelper<Components, ()>) {
         use graphics::*;
         use ShapeVarient::*;
         let pad = WINDOW_PADDING;
-        if let Some(ref gl_cell) = self.gl {
-        if let Some(ref meta) = self.meta {
+        if let (Some(ref gl_cell), Some(ref event)) = (self.gl, self.event) {
             let mut gl = gl_cell.borrow_mut();
-            let render = meta.render.get();
-            let view_width = render.width as f64 - 2.0 * pad;
-            let view_height = render.height as f64 - 2.0 * pad;
-            gl.draw([pad as i32, pad as i32, view_width as i32, view_height as i32], |c, gl| { // viewport
-                graphics::clear([0.2, 0.2, 0.2, 1.0], gl);
-                let r = Rectangle::new([0.0, 1.0, 0.0, 1.0]);
-                r.draw([0.0, 0.0, view_width, view_height], &c, gl);
-                let r = Rectangle::new([0.0, 0.0, 0.0, 1.0]);
-                r.draw([1.0, 1.0, view_width - 2.0,  view_height - 2.0], &c, gl);
-                for e in entities {
-                    let position = &data.positions[e];
-                    let shape = &data.shapes[e];
-                    let color = &data.colors[e];
-                    match shape.varient {
-                        Circle(rad) => {
-                            Ellipse::new([color.r, color.g, color.b, 1.0])
-                                .draw([
-                                      position.x,
-                                      position.y,
-                                      2.0*rad, 2.0*rad
-                                ], &c, gl);
-                        },
-                        Square(w, h) => {
-                            Rectangle::new([color.r, color.g, color.b, 1.0])
-                                .draw([
-                                      position.x,
-                                      position.y,
-                                      w, h
-                                ], &c, gl);
-                        },
-                        Point => {
-                            Rectangle::new([color.r, color.g, color.b, 1.0])
-                                .draw([
-                                      position.x,
-                                      position.y,
-                                      1.0f64, 1.0f64
-                                ], &c, gl);
+            let e = event.borrow();
+            if let Some(render) = e.render_args() {
+                let view_width = render.width as f64 - 2.0 * pad;
+                let view_height = render.height as f64 - 2.0 * pad;
+                gl.draw([pad as i32, pad as i32, view_width as i32, view_height as i32], |c, gl| { // viewport
+                    graphics::clear([0.2, 0.2, 0.2, 1.0], gl);
+                    graphics::rectangle([0.0, 1.0, 0.0, 1.0],
+                                        [0.0, 0.0, view_width, view_height],
+                                        c.transform,
+                                        gl);
+                    graphics::rectangle([0.0, 0.0, 0.0, 1.0],
+                                        [1.0, 1.0, view_width - 2.0,  view_height - 2.0],
+                                        c.transform,
+                                        gl);
+                    for e in entities {
+                        let position = &data.positions[e];
+                        let shape = &data.shapes[e];
+                        let color = &data.colors[e];
+                        match shape.varient {
+                            Circle(rad) => {
+                                graphics::ellipse([color.r, color.g, color.b, 1.0],
+                                                  [
+                                                      position.x,
+                                                      position.y,
+                                                      2.0*rad, 2.0*rad
+                                                  ],
+                                                  c.transform,
+                                                  gl);
+                            },
+                            Square(w, h) => {
+                                graphics::rectangle([color.r, color.g, color.b, 1.0],
+                                                    [
+                                                        position.x,
+                                                        position.y,
+                                                        w, h
+                                                    ],
+                                                    c.transform,
+                                                    gl);
+                            },
+                            Point => {
+                                graphics::rectangle([color.r, color.g, color.b, 1.0],
+                                                    [
+                                                        position.x,
+                                                        position.y,
+                                                        1.0f64, 1.0f64
+                                                    ],
+                                                    c.transform,
+                                                    gl);
+                            }
                         }
                     }
-                }
-            });
+                });
+            } // if let Some(render)
         } //gl cell
-        } // meta
     }
 }
 
 pub struct MoveSystem {
-    meta: Option<Rc<Meta>>
+    event: Option<RefCell<Event>>
 }
 
 impl System for MoveSystem {
     type Components = Components;
+    type Services = ();
 }
 
 impl EntityProcess for MoveSystem {
-    fn process(&mut self, entities: EntityIter<Components>, data: &mut DataHelper<Components>) {
+    fn process(&mut self, entities: EntityIter<Components>, data: &mut DataHelper<Components, ()>) {
         use graphics::*;
         use ShapeVarient::*;
         use ClampVarient::*;
@@ -145,77 +153,94 @@ impl EntityProcess for MoveSystem {
             };
             let shape = data.shapes[e].clone();
             let clamp = data.clamps[e].clone();
-            if let Some(ref meta) = self.meta {
-                let dt = meta.update.get().dt;
-                let render = meta.render.get();
-                let view_width = render.width as f64 - 2.0 * WINDOW_PADDING;
-                let view_height = render.height as f64 - 2.0 * WINDOW_PADDING;
+            if let Some(ref event) = self.event {
+                let e = event.borrow();
+                if let Some(update) = e.update_args() {
+                    let dt = update.dt;
+                    let view_width = WINDOW_W as f64 - 2.0 * WINDOW_PADDING;
+                    let view_height = WINDOW_H as f64 - 2.0 * WINDOW_PADDING;
 
-                let (px, py) = {
-                    let position = &mut(data.positions[e]);
-                    position.x += vx * dt;
-                    position.y += vy * dt;
-                    (position.x, position.y)
-                };
+                    let (px, py) = {
+                        let position = &mut(data.positions[e]);
+                        position.x += vx * dt;
+                        position.y += vy * dt;
+                        (position.x, position.y)
+                    };
 
-                let (w, h) = match shape.varient {
-                    Circle(r) => (r*2.0, r*2.0),
-                    Square(w,h) => (w, h),
-                    Point => (0.0, 0.0)
-                };
+                    let (w, h) = match shape.varient {
+                        Circle(r) => (r*2.0, r*2.0),
+                        Square(w,h) => (w, h),
+                        Point => (0.0, 0.0)
+                    };
 
-                let velocity_mult = match clamp.varient {
-                  Bounce => -1.0,
-                  Stop => 0.0,
-                  _ => 1.0
-                };
+                    let velocity_mult = match clamp.varient {
+                      Bounce => -1.0,
+                      Stop => 0.0,
+                      _ => 1.0
+                    };
 
-                match clamp.varient {
-                  Bounce | Stop => {
-                    if px + w > view_width {
-                      {
-                          let position = &mut(data.positions[e]);
-                          position.x = view_width - w;
+                    match clamp.varient {
+                      Bounce | Stop => {
+                        if px + w > view_width {
+                          {
+                              let position = &mut(data.positions[e]);
+                              position.x = view_width - w;
+                          }
+                          let velocity  = &mut(data.velocities[e]);
+                          velocity.x *= velocity_mult;
+                        } else if px < 0.0 {
+                          {
+                              let position = &mut(data.positions[e]);
+                              position.x = 0.0;
+                          }
+                          let velocity  = &mut(data.velocities[e]);
+                          velocity.x *= velocity_mult;
+                        }
+                        if py + h > view_height {
+                          {
+                              let position = &mut(data.positions[e]);
+                              position.y = view_height - h;
+                          }
+                          let velocity  = &mut(data.velocities[e]);
+                          velocity.y *= velocity_mult;
+                        } else if py < 0.0 {
+                          {
+                              let position = &mut(data.positions[e]);
+                              position.y = 0.0;
+                          }
+                          let velocity  = &mut(data.velocities[e]);
+                          velocity.y *= velocity_mult;
+                        }
+                      },
+                      Remove => {
+                        if px > view_width
+                        || px + w < 0.0 {
+                            println!("Should remove, went off horizontal edge");
+                        }
+                        if py > view_height
+                        || py + h < 0.0 {
+                            println!("Should remove, went off vertical edge");
+                        }
                       }
-                      let velocity  = &mut(data.velocities[e]);
-                      velocity.x *= velocity_mult;
-                    } else if px < 0.0 {
-                      {
-                          let position = &mut(data.positions[e]);
-                          position.x = 0.0;
-                      }
-                      let velocity  = &mut(data.velocities[e]);
-                      velocity.x *= velocity_mult;
                     }
-                    if py + h > view_height {
-                      {
-                          let position = &mut(data.positions[e]);
-                          position.y = view_height - h;
-                      }
-                      let velocity  = &mut(data.velocities[e]);
-                      velocity.y *= velocity_mult;
-                    } else if py < 0.0 {
-                      {
-                          let position = &mut(data.positions[e]);
-                          position.y = 0.0;
-                      }
-                      let velocity  = &mut(data.velocities[e]);
-                      velocity.y *= velocity_mult;
-                    }
-                  },
-                  Remove => {
-                    if px > view_width
-                    || px + w < 0.0 {
-                        println!("Should remove, went off horizontal edge");
-                    }
-                    if py > view_height
-                    || py + h < 0.0 {
-                        println!("Should remove, went off vertical edge");
-                    }
-                  }
                 }
             }
         }
+    }
+}
+
+pub struct ControlSystem {
+    event: Option<RefCell<Event>>
+}
+
+impl System for ControlSystem {
+    type Components = Components;
+    type Services = ();
+}
+
+impl EntityProcess for ControlSystem {
+    fn process(&mut self, entities: EntityIter<Components>, data: &mut DataHelper<Components, ()>) {
+        const PADDLE_V: f64 = 800.0;
     }
 }
 
@@ -223,23 +248,22 @@ impl EntityProcess for MoveSystem {
 //              controllers: &mut Components<PlayerController>,
 //              velocities: &mut Components<Velocity>) {
 //
-//    const PADDLE_V: f64 = 800.0;
 //
-////    for (eid, controller) in controllers.iter_mut() {
-////        event.press(|button| {
-////            if button == Keyboard(controller.up) {
-////                velocities.get_mut(eid).y = -PADDLE_V;
-////            } else if button == Keyboard(controller.down) {
-////                velocities.get_mut(eid).y = PADDLE_V;
-////            }
-////        });
-////        event.release(|button| {
-////            if button == Keyboard(controller.up)
-////            || button == Keyboard(controller.down) {
-////                velocities.get_mut(eid).y = 0.0;
-////            }
-////        });
-////    }
+//    for (eid, controller) in controllers.iter_mut() {
+//        event.press(|button| {
+//            if button == Keyboard(controller.up) {
+//                velocities.get_mut(eid).y = -PADDLE_V;
+//            } else if button == Keyboard(controller.down) {
+//                velocities.get_mut(eid).y = PADDLE_V;
+//            }
+//        });
+//        event.release(|button| {
+//            if button == Keyboard(controller.up)
+//            || button == Keyboard(controller.down) {
+//                velocities.get_mut(eid).y = 0.0;
+//            }
+//        });
+//    }
 //}
 
 #[derive(Clone, PartialEq, Debug)]
@@ -312,27 +336,27 @@ components! {
 }
 
 systems! {
-    Systems<Components> {
+    Systems<Components, ()> {
         shimmer: EntitySystem<ShimmerSystem> = EntitySystem::new( ShimmerSystem,
             aspect!(<Components> all: [colors, shimmers])
         ),
         moves: EntitySystem<MoveSystem> = EntitySystem::new(
-            MoveSystem{ meta: None },
+            MoveSystem{ event: None },
             aspect!(<Components> all: [positions, shapes, velocities, clamps])
         ),
         draw: EntitySystem<DrawSystem> = EntitySystem::new(
-            DrawSystem{ gl: None, meta: None },
+            DrawSystem{ gl: None, event: None },
             aspect!(<Components> all: [positions, shapes, colors])
         )
     }
 }
 
-fn make_ball(world: &mut World<Components, Systems>) {
+fn make_ball(world: &mut World<Systems>) {
     const BALL_R: f64 = 20.0;
     let x = (VIEW_W - BALL_R) / 2.0;
     let y = (VIEW_H - BALL_R) / 2.0;
 
-    let entity = world.create_entity(|entity: BuildData, data: &mut Components| {
+    let entity = world.create_entity(|entity: BuildData<Components>, data: &mut Components| {
         data.positions.add(&entity,
             Position{
                 x: x,
@@ -362,7 +386,7 @@ fn make_ball(world: &mut World<Components, Systems>) {
     });
 }
 
-fn make_player(world: &mut World<Components, Systems>, p1: bool) {
+fn make_player(world: &mut World<Systems>, p1: bool) {
     const FROM_WALL: f64 = 40.0;
     const PADDLE_W: f64 = 20.0;
     const PADDLE_H: f64 = 150.0;
@@ -372,7 +396,7 @@ fn make_player(world: &mut World<Components, Systems>, p1: bool) {
         VIEW_W - FROM_WALL - PADDLE_W
     };
     let y = (VIEW_H - PADDLE_H) / 2.0;
-    let entity = world.create_entity(|entity: BuildData, data: &mut Components| {
+    let entity = world.create_entity(|entity: BuildData<Components>, data: &mut Components| {
         data.positions.add(&entity,
             Position{
                 x: x,
@@ -412,29 +436,36 @@ fn main() {
 
     let mut gl = Gl::new(opengl);
 
-    let mut world = World::<Components, Systems>::new();
+    let mut world = World::<Systems>::new();
     world.systems.draw.gl = Some(RefCell::new(gl));
     make_ball(&mut world);
     make_player(&mut world, true);
     make_player(&mut world, false);
-    let mut meta = Rc::new(Meta {
-        render: Cell::new(RenderArgs { ext_dt: 0.0, width: 0, height: 0 }),
-        update: Cell::new(UpdateArgs { dt: 0.0 })
-    });
+    let mut event_cell = RefCell::new(Event::Update(UpdateArgs { dt: 0.0 }));
 
-    world.systems.moves.meta = Some(meta.clone());
-    world.systems.draw.meta = Some(meta.clone());
+    world.systems.moves.event = Some(event_cell.clone());
+    world.systems.draw.event = Some(event_cell.clone());
 
     for e in event::events(window) {
         use event::{ ReleaseEvent, UpdateEvent, PressEvent, RenderEvent };
-
-        if let Some(args) = e.update_args() {
-            meta.update.set(args);
-            world.update();
-        }
-        if let Some(args) = e.render_args() {
-            meta.render.set(args);
-            process!(world, draw);
-        }
+        *(event_cell.as_unsafe_cell().get()) = e;
+        world.update();
+//
+//        if let Some(args) = e.update_args() {
+//            meta.update.set(e);
+//            world.update();
+//        }
+//        if let Some(args) = e.render_args() {
+//            meta.render.set(args);
+//            process!(world, draw);
+//        }
+//        if let Some(args) = e.press_args() {
+//            meta.press.set(args);
+//            process!(world, draw);
+//        }
+//        if let Some(args) = e.release_args() {
+//            meta.release.set(args);
+//            process!(world, draw);
+//        }
     }
 }
