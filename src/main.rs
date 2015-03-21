@@ -54,9 +54,9 @@ impl EntityProcess for ShimmerSystem {
         for e in entities {
             let color = &mut data.colors[e];
             let ref mut rng = rand::thread_rng();
-            color.r = rng.gen_range(0.5, 1.0);
-            color.g = rng.gen_range(0.5, 1.0);
-            color.b = rng.gen_range(0.5, 1.0);
+            color.0[0] = rng.gen_range(0.5, 1.0);
+            color.0[1] = rng.gen_range(0.5, 1.0);
+            color.0[2] = rng.gen_range(0.5, 1.0);
         }
     }
 }
@@ -90,37 +90,46 @@ impl EntityProcess for DrawSystem {
                     for e in entities {
                         let position = &data.positions[e];
                         let shape = &data.shapes[e];
-                        let color = &data.colors[e];
+                        let graphics::Color(color) = data.colors[e];
                         match shape.varient {
                             Circle(rad) => {
-                                graphics::ellipse([color.r, color.g, color.b, 1.0],
-                                                  [
-                                                      position.x,
-                                                      position.y,
-                                                      2.0*rad, 2.0*rad
-                                                  ],
-                                                  c.transform,
-                                                  gl);
-                            },
+                                let circle = Ellipse::new(color);
+                                circle.draw(
+                                    graphics::ellipse::centered([
+                                        position.x,
+                                        position.y,
+                                        rad, rad
+                                    ]),
+                                    &c.draw_state,
+                                    c.transform,
+                                    gl
+                                );
+                            }
                             Square(w, h) => {
-                                graphics::rectangle([color.r, color.g, color.b, 1.0],
-                                                    [
-                                                        position.x,
-                                                        position.y,
-                                                        w, h
-                                                    ],
-                                                    c.transform,
-                                                    gl);
+                                let square = Rectangle::new(color);
+                                square.draw(
+                                    graphics::rectangle::centered([
+                                        position.x,
+                                        position.y,
+                                        w/2.0, h/2.0
+                                    ]),
+                                    &c.draw_state,
+                                    c.transform,
+                                    gl
+                                );
                             },
                             Point => {
-                                graphics::rectangle([color.r, color.g, color.b, 1.0],
-                                                    [
-                                                        position.x,
-                                                        position.y,
-                                                        1.0f64, 1.0f64
-                                                    ],
-                                                    c.transform,
-                                                    gl);
+                                let pixel = Rectangle::new(color);
+                                pixel.draw(
+                                    [
+                                        position.x,
+                                        position.y,
+                                        0.5, 0.5
+                                    ],
+                                    &c.draw_state,
+                                    c.transform,
+                                    gl
+                                );
                             }
                         }
                     }
@@ -164,8 +173,8 @@ impl EntityProcess for MoveSystem {
                     };
 
                     let (w, h) = match shape.varient {
-                        Circle(r) => (r*2.0, r*2.0),
-                        Square(w,h) => (w, h),
+                        Circle(r) => (r, r),
+                        Square(w,h) => (w/2.0, h/2.0),
                         Point => (0.0, 0.0)
                     };
 
@@ -184,10 +193,10 @@ impl EntityProcess for MoveSystem {
                           }
                           let velocity  = &mut(data.velocities[e]);
                           velocity.x *= velocity_mult;
-                        } else if px < 0.0 {
+                        } else if px - w < 0.0 {
                           {
                               let position = &mut(data.positions[e]);
-                              position.x = 0.0;
+                              position.x = w;
                           }
                           let velocity  = &mut(data.velocities[e]);
                           velocity.x *= velocity_mult;
@@ -199,21 +208,21 @@ impl EntityProcess for MoveSystem {
                           }
                           let velocity  = &mut(data.velocities[e]);
                           velocity.y *= velocity_mult;
-                        } else if py < 0.0 {
+                        } else if py - h < 0.0 {
                           {
                               let position = &mut(data.positions[e]);
-                              position.y = 0.0;
+                              position.y = h;
                           }
                           let velocity  = &mut(data.velocities[e]);
                           velocity.y *= velocity_mult;
                         }
                       },
                       Remove => {
-                        if px > view_width
+                        if px - w > view_width
                         || px + w < 0.0 {
                             println!("Should remove, went off horizontal edge");
                         }
-                        if py > view_height
+                        if py - h > view_height
                         || py + h < 0.0 {
                             println!("Should remove, went off vertical edge");
                         }
@@ -292,13 +301,6 @@ pub struct Position {
 pub struct Shimmer;
 
 #[derive(Clone, PartialEq, Debug)]
-pub struct Color {
-    r: f32,
-    g: f32,
-    b: f32
-}
-
-#[derive(Clone, PartialEq, Debug)]
 pub enum ShapeVarient {
     Point,
     Circle(f64), // radius
@@ -326,7 +328,7 @@ components! {
         #[hot] positions: Position,
         #[hot] shapes: Shape,
         #[hot] velocities: Velocity,
-        #[hot] colors: Color,
+        #[hot] colors: graphics::Color,
         #[hot] shimmers: Shimmer,
         #[hot] player_controllers: PlayerController,
         #[hot] clamps: WindowClamp
@@ -382,12 +384,7 @@ fn make_ball(world: &mut World<Systems>) {
                 varient: ShapeVarient::Circle(BALL_R),
                 border: None
         });
-        data.colors.add(&entity,
-            Color{
-                r: 1.0,
-                g: 0.5,
-                b: 0.2
-        });
+        data.colors.add(&entity, graphics::Color([1.0, 0.5, 0.2, 1.0]));
         data.clamps.add(&entity,
             WindowClamp {
                varient: ClampVarient::Bounce
@@ -396,15 +393,15 @@ fn make_ball(world: &mut World<Systems>) {
 }
 
 fn make_player(world: &mut World<Systems>, p1: bool) {
-    const FROM_WALL: f64 = 40.0;
+    const FROM_WALL: f64 = 20.0;
     const PADDLE_W: f64 = 20.0;
     const PADDLE_H: f64 = 150.0;
     let x = if p1 {
         FROM_WALL
     } else {
-        VIEW_W - FROM_WALL - PADDLE_W
+        VIEW_W - FROM_WALL
     };
-    let y = (VIEW_H - PADDLE_H) / 2.0;
+    let y = VIEW_H / 2.0;
     let entity = world.create_entity(|entity: BuildData<Components>, data: &mut Components| {
         data.positions.add(&entity,
             Position{
@@ -421,12 +418,7 @@ fn make_player(world: &mut World<Systems>, p1: bool) {
                 varient: ShapeVarient::Square(PADDLE_W, PADDLE_H),
                 border: None
         });
-        data.colors.add(&entity,
-            Color{
-                r: 1.0,
-                g: 0.5,
-                b: 1.0
-        });
+        data.colors.add(&entity, graphics::Color([1.0, 0.5, 1.0, 1.0]));
         data.player_controllers.add(&entity,
             PlayerController {
                 up: if p1 { keyboard::Key::W } else { keyboard::Key::I },
