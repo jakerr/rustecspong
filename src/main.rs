@@ -38,6 +38,36 @@ const WINDOW_PADDING: f64 = 20.0;
 const VIEW_W: f64 = (WINDOW_W - 2.0 * WINDOW_PADDING);
 const VIEW_H: f64 = (WINDOW_H - 2.0 * WINDOW_PADDING);
 
+pub struct FadeSystem;
+
+impl System for FadeSystem {
+    type Components = Components;
+    type Services = Services;
+}
+
+impl EntityProcess for FadeSystem {
+    fn process(&mut self, entities: EntityIter<Components>, data: &mut DataHelper<Components, Services>) {
+        let event = data.services.event.clone();
+        let event =  event.borrow();
+        if let Some(update) = event.update_args() {
+            for e in entities {
+                let delete = {
+                    let mut delete = false;
+                    let color = &mut data.colors[e];
+                    color.0[3] -= 0.05;
+                    if color.0[3] <= 0.0 {
+                        delete = true;
+                    }
+                    delete
+                };
+                if delete {
+                    data.remove_entity(**e);
+                }
+            }
+        }
+    }
+}
+
 pub struct ShimmerSystem;
 
 impl System for ShimmerSystem {
@@ -45,21 +75,26 @@ impl System for ShimmerSystem {
     type Services = Services;
 }
 
+impl EntityProcess for ShimmerSystem {
+    fn process(&mut self, entities: EntityIter<Components>, data: &mut DataHelper<Components, Services>) {
+        let event = data.services.event.clone();
+        let event =  event.borrow();
+        if let Some(update) = event.render_args() {
+            for e in entities {
+                let color = &mut data.colors[e];
+                let ref mut rng = rand::thread_rng();
+                color.0[0] = rng.gen_range(0.3, 1.0);
+                color.0[1] = rng.gen_range(0.3, 1.0);
+                color.0[2] = rng.gen_range(0.3, 1.0);
+            }
+        }
+    }
+}
+
 pub struct DrawSystem {
     gl: Option<RefCell<Gl>>,
 }
 
-impl EntityProcess for ShimmerSystem {
-    fn process(&mut self, entities: EntityIter<Components>, data: &mut DataHelper<Components, Services>) {
-        for e in entities {
-            let color = &mut data.colors[e];
-            let ref mut rng = rand::thread_rng();
-            color.0[0] = rng.gen_range(0.5, 1.0);
-            color.0[1] = rng.gen_range(0.5, 1.0);
-            color.0[2] = rng.gen_range(0.5, 1.0);
-        }
-    }
-}
 
 impl System for DrawSystem {
     type Components = Components;
@@ -69,7 +104,7 @@ impl System for DrawSystem {
 impl EntityProcess for DrawSystem {
     fn process(&mut self, entities: EntityIter<Components>, data: &mut DataHelper<Components, Services>) {
         use graphics::*;
-        use ShapeVarient::*;
+        use ShapeVarient as shape;
         let pad = WINDOW_PADDING;
         if let Some(ref gl_cell) = self.gl {
             let mut gl = gl_cell.borrow_mut();
@@ -92,7 +127,7 @@ impl EntityProcess for DrawSystem {
                         let shape = &data.shapes[e];
                         let graphics::Color(color) = data.colors[e];
                         match shape.varient {
-                            Circle(rad) => {
+                            shape::Circle(rad) => {
                                 let circle = Ellipse::new(color);
                                 circle.draw(
                                     graphics::ellipse::centered([
@@ -105,7 +140,7 @@ impl EntityProcess for DrawSystem {
                                     gl
                                 );
                             }
-                            Square(w, h) => {
+                            shape::Square(w, h) => {
                                 let square = Rectangle::new(color);
                                 square.draw(
                                     graphics::rectangle::centered([
@@ -118,7 +153,7 @@ impl EntityProcess for DrawSystem {
                                     gl
                                 );
                             },
-                            Point => {
+                            shape::Point => {
                                 let pixel = Rectangle::new(color);
                                 pixel.draw(
                                     [
@@ -126,6 +161,15 @@ impl EntityProcess for DrawSystem {
                                         position.y,
                                         0.5, 0.5
                                     ],
+                                    &c.draw_state,
+                                    c.transform,
+                                    gl
+                                );
+                            }
+                            shape::Line(l) => {
+                                let line = Line::new(color, 2.0);
+                                line.draw(
+                                    l,
                                     &c.draw_state,
                                     c.transform,
                                     gl
@@ -185,9 +229,9 @@ impl EntityProcess for CollisionSystem {
                             let dy = (px.y - circle_center.y);
                             let dist2 = dx * dx + dy * dy;
 
+                            dbg_line(data, [px.x, px.y, circle_center.x, circle_center.y]);
                             if r*r > dist2 {
-                                println!("Circle / Square collided!!");
-                                *(&mut(data.positions[*c].x)) = px.x + r + 10.0;
+                                dbg_ghost(data, c);
                                 *(&mut(data.velocities[*c].x)) *= vx;
                                 *(&mut(data.velocities[*c].y)) *= vy;
                             }
@@ -210,7 +254,7 @@ impl System for MoveSystem {
 impl EntityProcess for MoveSystem {
     fn process(&mut self, entities: EntityIter<Components>, data: &mut DataHelper<Components, Services>) {
         use graphics::*;
-        use ShapeVarient::*;
+        use ShapeVarient as shape;
         use ClampVarient::*;
         for e in entities {
             let (vx, vy) = {
@@ -234,9 +278,10 @@ impl EntityProcess for MoveSystem {
                     };
 
                     let (w, h) = match shape.varient {
-                        Circle(r) => (r, r),
-                        Square(w,h) => (w, h),
-                        Point => (0.0, 0.0)
+                        shape::Circle(r) => (r, r),
+                        shape::Square(w,h) => (w, h),
+                        shape::Point => (1.0, 0.0),
+                        shape::Line(_) => (0.0, 0.0)
                     };
 
                     let velocity_mult = match clamp.varient {
@@ -362,10 +407,14 @@ pub struct Position {
 pub struct Shimmer;
 
 #[derive(Clone, PartialEq, Debug)]
+pub struct Fade;
+
+#[derive(Clone, PartialEq, Debug)]
 pub enum ShapeVarient {
     Point,
     Circle(f64), // radius
     Square(f64, f64), // width, height
+    Line([f64; 4]), // x1, y1, x2, y2
 }
 
 impl Default for ShapeVarient {
@@ -390,6 +439,7 @@ components! {
         #[hot] shapes: Shape,
         #[hot] velocities: Velocity,
         #[hot] colors: graphics::Color,
+        #[hot] fades: Fade,
         #[hot] shimmers: Shimmer,
         #[hot] player_controllers: PlayerController,
         #[hot] clamps: WindowClamp
@@ -398,8 +448,8 @@ components! {
 
 systems! {
     Systems<Components, Services> {
-        shimmer: EntitySystem<ShimmerSystem> = EntitySystem::new( ShimmerSystem,
-            aspect!(<Components> all: [colors, shimmers])
+        fade: EntitySystem<FadeSystem> = EntitySystem::new( FadeSystem,
+            aspect!(<Components> all: [colors, fades])
         ),
         control: EntitySystem<ControlSystem> = EntitySystem::new(
             ControlSystem,
@@ -407,11 +457,14 @@ systems! {
         ),
         collisions: EntitySystem<CollisionSystem> = EntitySystem::new(
             CollisionSystem,
-            aspect!(<Components> all: [positions, shapes])
+            aspect!(<Components> all: [positions, shapes, velocities])
         ),
         moves: EntitySystem<MoveSystem> = EntitySystem::new(
             MoveSystem,
             aspect!(<Components> all: [positions, shapes, velocities, clamps])
+        ),
+        shimmer: EntitySystem<ShimmerSystem> = EntitySystem::new( ShimmerSystem,
+            aspect!(<Components> all: [colors, shimmers])
         ),
         draw: EntitySystem<DrawSystem> = EntitySystem::new(
             DrawSystem{ gl: None },
@@ -427,20 +480,59 @@ services! {
     }
 }
 
+impl<'a> EntityBuilder<Components> for EntityData<'a, Components> {
+    fn build<'b>(&mut self, b: BuildData<'b, Components>, t: &mut Components) {
+        if t.colors.has(self) {
+            let color = t.colors[*self];
+            t.colors.add(&b, color);
+        }
+        if t.shapes.has(self) {
+            let shape = t.shapes[*self].clone();
+            t.shapes.add(&b, shape);
+        }
+        if t.positions.has(self) {
+            let pos = t.positions[*self].clone();
+            t.positions.add(&b, pos);
+        }
+        t.fades.add(&b, Fade);
+    }
+}
+
+fn dbg_ghost(d: &mut DataHelper<Components, Services>, entity: &EntityData<Components>) {
+    let ghost = entity.clone();
+    d.create_entity(ghost);
+}
+
 fn dbg_line(d: &mut DataHelper<Components, Services>, line: [f64; 4]) {
     d.create_entity(|entity: BuildData<Components>, data: &mut Components| {
         data.positions.add(&entity,
             Position{
-                x: line[0],
-                y: line[1]
-        });
-    })
+                x: (line[0] + line[2]) / 2.0,
+                y: (line[1] + line[3]) / 2.0
+            }
+        );
+        data.shapes.add(&entity,
+            Shape {
+                varient: ShapeVarient::Line(line),
+                border: None
+            }
+        );
+        data.colors.add(&entity, graphics::Color([0.0, 0.8, 0.0, 1.0]));
+        data.fades.add(&entity, Fade);
+    });
 }
 
 fn make_ball(world: &mut World<Systems>) {
     const BALL_R: f64 = 10.0;
-    let x = VIEW_W / 2.0;
-    let y = VIEW_H / 2.0;
+    let ref mut rng = rand::thread_rng();
+    let xoff = rng.gen_range(-100.0, 100.0);
+    let yoff = rng.gen_range(-100.0, 100.0);
+
+    let vx = rng.gen_range(-300.0, 300.0);
+    let vy = rng.gen_range(-300.0, 300.0);
+
+    let x = VIEW_W / 2.0 + xoff;
+    let y = VIEW_H / 2.0 + yoff;
 
     let entity = world.create_entity(|entity: BuildData<Components>, data: &mut Components| {
         data.positions.add(&entity,
@@ -450,31 +542,8 @@ fn make_ball(world: &mut World<Systems>) {
         });
         data.velocities.add(&entity,
             Velocity{
-                x: 300.0,
-                y: 200.0,
-        });
-        data.shimmers.add(&entity, Shimmer);
-        data.shapes.add(&entity,
-            Shape {
-                varient: ShapeVarient::Circle(BALL_R),
-                border: None
-        });
-        data.colors.add(&entity, graphics::Color([1.0, 0.5, 0.2, 1.0]));
-        data.clamps.add(&entity,
-            WindowClamp {
-               varient: ClampVarient::Bounce
-        });
-    });
-    let entity = world.create_entity(|entity: BuildData<Components>, data: &mut Components| {
-        data.positions.add(&entity,
-            Position{
-                x: x + 20.0,
-                y: y + 30.0
-        });
-        data.velocities.add(&entity,
-            Velocity{
-                x: 230.0,
-                y: 100.0,
+                x: vx,
+                y: vy,
         });
         data.shimmers.add(&entity, Shimmer);
         data.shapes.add(&entity,
@@ -546,6 +615,9 @@ fn main() {
 
     let mut world = World::<Systems>::new();
     world.systems.draw.gl = Some(RefCell::new(gl));
+    make_ball(&mut world);
+    make_ball(&mut world);
+    make_ball(&mut world);
     make_ball(&mut world);
     make_player(&mut world, true);
     make_player(&mut world, false);
