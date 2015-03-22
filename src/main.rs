@@ -427,6 +427,16 @@ services! {
     }
 }
 
+fn dbg_line(d: &mut DataHelper<Components, Services>, line: [f64; 4]) {
+    d.create_entity(|entity: BuildData<Components>, data: &mut Components| {
+        data.positions.add(&entity,
+            Position{
+                x: line[0],
+                y: line[1]
+        });
+    })
+}
+
 fn make_ball(world: &mut World<Systems>) {
     const BALL_R: f64 = 10.0;
     let x = VIEW_W / 2.0;
