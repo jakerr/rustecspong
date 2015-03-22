@@ -111,7 +111,7 @@ impl EntityProcess for DrawSystem {
                                     graphics::rectangle::centered([
                                         position.x,
                                         position.y,
-                                        w/2.0, h/2.0
+                                        w, h
                                     ]),
                                     &c.draw_state,
                                     c.transform,
@@ -136,6 +136,67 @@ impl EntityProcess for DrawSystem {
                 });
             } // if let Some(render)
         } //gl cell
+    }
+}
+
+pub struct CollisionSystem;
+
+impl System for CollisionSystem {
+    type Components = Components;
+    type Services = Services;
+}
+
+impl EntityProcess for CollisionSystem {
+    fn process(&mut self, entities: EntityIter<Components>, data: &mut DataHelper<Components, Services>) {
+        use ShapeVarient::*;
+
+        let event = data.services.event.clone();
+        let event =  event.borrow();
+        if let Some(update) = event.update_args() {
+            let evec: Vec<EntityData<Components>> = entities.collect();
+            for (i, e1) in evec.iter().enumerate() {
+                let shape1 = data.shapes[*e1].clone();
+
+                let targets = evec.iter().skip(i+1);
+                for e2 in targets {
+                    let p1 = data.positions[*e1].clone();
+                    let p2 = data.positions[*e2].clone();
+                    let dist2 = {
+                        let d2 = (p1.x - p2.x) * (p1.x - p2.x) + (p1.y - p2.y) * (p1.y - p2.y);
+                        d2
+                    };
+                    let shape2 = data.shapes[*e2].clone();
+                    match (e1, e2, p1, p2, &shape1.varient, &shape2.varient) {
+                        (_, _, _, _, &Circle(r1), &Circle(r2)) => {
+                            if (r1 + r2)*(r1 + r2) > dist2 {
+                            }
+                        }
+                        (s, c, square_center, circle_center, &Square(w,h), &Circle(r)) |
+                        (c, s, circle_center, square_center, &Circle(r), &Square(w, h)) => {
+                            let mut px = circle_center.clone();
+                            let mut vx = 1.0;
+                            let mut vy = 1.0;
+                            if circle_center.x < square_center.x - w { px.x = square_center.x - w; vx = -1.0 }
+                            if circle_center.x > square_center.x + w { px.x = square_center.x + w; vx = -1.0 }
+                            if circle_center.y < square_center.y - h { px.y = square_center.y - h; vy = -1.0 }
+                            if circle_center.y > square_center.y + h { px.y = square_center.y + h; vy = -1.0 }
+
+                            let dx = (px.x - circle_center.x);
+                            let dy = (px.y - circle_center.y);
+                            let dist2 = dx * dx + dy * dy;
+
+                            if r*r > dist2 {
+                                println!("Circle / Square collided!!");
+                                *(&mut(data.positions[*c].x)) = px.x + r + 10.0;
+                                *(&mut(data.velocities[*c].x)) *= vx;
+                                *(&mut(data.velocities[*c].y)) *= vy;
+                            }
+                        }
+                        _ => ()
+                    }
+                }
+            }
+        }
     }
 }
 
@@ -174,7 +235,7 @@ impl EntityProcess for MoveSystem {
 
                     let (w, h) = match shape.varient {
                         Circle(r) => (r, r),
-                        Square(w,h) => (w/2.0, h/2.0),
+                        Square(w,h) => (w, h),
                         Point => (0.0, 0.0)
                     };
 
@@ -344,6 +405,10 @@ systems! {
             ControlSystem,
             aspect!(<Components> all: [player_controllers, velocities])
         ),
+        collisions: EntitySystem<CollisionSystem> = EntitySystem::new(
+            CollisionSystem,
+            aspect!(<Components> all: [positions, shapes])
+        ),
         moves: EntitySystem<MoveSystem> = EntitySystem::new(
             MoveSystem,
             aspect!(<Components> all: [positions, shapes, velocities, clamps])
@@ -363,9 +428,9 @@ services! {
 }
 
 fn make_ball(world: &mut World<Systems>) {
-    const BALL_R: f64 = 20.0;
-    let x = (VIEW_W - BALL_R) / 2.0;
-    let y = (VIEW_H - BALL_R) / 2.0;
+    const BALL_R: f64 = 10.0;
+    let x = VIEW_W / 2.0;
+    let y = VIEW_H / 2.0;
 
     let entity = world.create_entity(|entity: BuildData<Components>, data: &mut Components| {
         data.positions.add(&entity,
@@ -390,12 +455,35 @@ fn make_ball(world: &mut World<Systems>) {
                varient: ClampVarient::Bounce
         });
     });
+    let entity = world.create_entity(|entity: BuildData<Components>, data: &mut Components| {
+        data.positions.add(&entity,
+            Position{
+                x: x + 20.0,
+                y: y + 30.0
+        });
+        data.velocities.add(&entity,
+            Velocity{
+                x: 230.0,
+                y: 100.0,
+        });
+        data.shimmers.add(&entity, Shimmer);
+        data.shapes.add(&entity,
+            Shape {
+                varient: ShapeVarient::Circle(BALL_R),
+                border: None
+        });
+        data.colors.add(&entity, graphics::Color([1.0, 0.5, 0.2, 1.0]));
+        data.clamps.add(&entity,
+            WindowClamp {
+               varient: ClampVarient::Bounce
+        });
+    });
 }
 
 fn make_player(world: &mut World<Systems>, p1: bool) {
     const FROM_WALL: f64 = 20.0;
-    const PADDLE_W: f64 = 20.0;
-    const PADDLE_H: f64 = 150.0;
+    const PADDLE_W: f64 = 10.0;
+    const PADDLE_H: f64 = 75.0;
     let x = if p1 {
         FROM_WALL
     } else {
