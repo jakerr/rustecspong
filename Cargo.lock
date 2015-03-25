@@ -2,8 +2,8 @@
 name = "rustecspong"
 version = "0.0.1"
 dependencies = [
- "ecs 0.18.1 (git+https://github.com/HeroesGrave/ecs-rs.git)",
- "piston2d-graphics 0.0.24 (git+https://github.com/pistondevelopers/graphics)",
+ "ecs 0.18.2 (git+https://github.com/HeroesGrave/ecs-rs.git)",
+ "piston2d-graphics 0.0.25 (git+https://github.com/pistondevelopers/graphics)",
  "piston2d-opengl_graphics 0.0.10 (git+https://github.com/pistondevelopers/opengl_graphics)",
  "pistoncore-event 0.0.10 (git+https://github.com/pistondevelopers/event)",
  "pistoncore-input 0.0.5 (git+https://github.com/pistondevelopers/input)",
@@ -11,7 +11,7 @@ dependencies = [
  "pistoncore-window 0.0.13 (git+https://github.com/pistondevelopers/window)",
  "quack 0.0.13 (git+https://github.com/pistondevelopers/quack)",
  "shader_version 0.0.4 (git+https://github.com/pistondevelopers/shader_version)",
- "vecmath 0.0.5 (git+https://github.com/PistonDevelopers/vecmath)",
+ "vecmath 0.0.5 (git+https://github.com/PistonDevelopers/vecmath.git)",
 ]
 
 [[package]]
@@ -26,7 +26,7 @@ source = "git+https://github.com/tomaka/clock_ticks#6a3005279bedc406b13eea09ff92
 
 [[package]]
 name = "draw_state"
-version = "0.0.1"
+version = "0.0.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 dependencies = [
  "bitflags 0.1.1 (registry+https://github.com/rust-lang/crates.io-index)",
@@ -34,8 +34,8 @@ dependencies = [
 
 [[package]]
 name = "ecs"
-version = "0.18.1"
-source = "git+https://github.com/HeroesGrave/ecs-rs.git#5903bb7e78c5b1a8785e52edc67b19ebde9645bb"
+version = "0.18.2"
+source = "git+https://github.com/HeroesGrave/ecs-rs.git#6f353f6934c9e3512a5dbe1f86049f4d06c3aa1f"
 
 [[package]]
 name = "freetype-rs"
@@ -89,7 +89,7 @@ dependencies = [
 [[package]]
 name = "image"
 version = "0.2.4"
-source = "git+https://github.com/pistondevelopers/image#8538368ebf8bdec5a5e1d9e772df217ac96a1cb8"
+source = "git+https://github.com/pistondevelopers/image#ad6c2bc128be48d6a077a25c4bd392e5d25492c9"
 dependencies = [
  "num 0.1.17 (registry+https://github.com/rust-lang/crates.io-index)",
 ]
@@ -151,21 +151,21 @@ source = "git+https://github.com/PistonDevelopers/texture#3cc4cddc3f8c51c36ea11d
 
 [[package]]
 name = "piston2d-graphics"
-version = "0.0.24"
-source = "git+https://github.com/pistondevelopers/graphics#7332362828e0f2cc84328376d2f38950d384825e"
+version = "0.0.25"
+source = "git+https://github.com/pistondevelopers/graphics#304e472bb726807ced6f92e5a249b1c9b6009a3d"
 dependencies = [
- "draw_state 0.0.1 (registry+https://github.com/rust-lang/crates.io-index)",
+ "draw_state 0.0.2 (registry+https://github.com/rust-lang/crates.io-index)",
  "interpolation 0.0.2 (git+https://github.com/PistonDevelopers/interpolation)",
  "piston-texture 0.0.1 (git+https://github.com/PistonDevelopers/texture)",
  "quack 0.0.13 (git+https://github.com/pistondevelopers/quack)",
  "read_color 0.0.2 (git+https://github.com/PistonDevelopers/read_color)",
- "vecmath 0.0.5 (git+https://github.com/PistonDevelopers/vecmath)",
+ "vecmath 0.0.5 (git+https://github.com/PistonDevelopers/vecmath.git)",
 ]
 
 [[package]]
 name = "piston2d-opengl_graphics"
 version = "0.0.10"
-source = "git+https://github.com/pistondevelopers/opengl_graphics#28b42fa72a839504b433a464d6814cb4aaa3488c"
+source = "git+https://github.com/pistondevelopers/opengl_graphics#d4b2203c43de4d345cb2277faaa83f64866006c0"
 dependencies = [
  "freetype-rs 0.0.7 (git+https://github.com/PistonDevelopers/freetype-rs.git)",
  "gl 0.0.11 (git+https://github.com/bjz/gl-rs)",
@@ -173,7 +173,7 @@ dependencies = [
  "khronos_api 0.0.5 (registry+https://github.com/rust-lang/crates.io-index)",
  "libc 0.1.3 (registry+https://github.com/rust-lang/crates.io-index)",
  "piston-texture 0.0.1 (git+https://github.com/PistonDevelopers/texture)",
- "piston2d-graphics 0.0.24 (git+https://github.com/pistondevelopers/graphics)",
+ "piston2d-graphics 0.0.25 (git+https://github.com/pistondevelopers/graphics)",
  "shader_version 0.0.4 (git+https://github.com/pistondevelopers/shader_version)",
 ]
 
@@ -216,7 +216,7 @@ dependencies = [
  "pistoncore-input 0.0.5 (git+https://github.com/pistondevelopers/input)",
  "pistoncore-window 0.0.13 (git+https://github.com/pistondevelopers/window)",
  "quack 0.0.13 (git+https://github.com/pistondevelopers/quack)",
- "sdl2 0.0.31 (git+https://github.com/AngryLawyer/rust-sdl2)",
+ "sdl2 0.0.32 (git+https://github.com/AngryLawyer/rust-sdl2)",
  "shader_version 0.0.4 (git+https://github.com/pistondevelopers/shader_version)",
 ]
 
@@ -249,6 +249,15 @@ dependencies = [
 ]
 
 [[package]]
+name = "rand"
+version = "0.3.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+dependencies = [
+ "libc 0.1.3 (registry+https://github.com/rust-lang/crates.io-index)",
+ "log 0.3.0 (registry+https://github.com/rust-lang/crates.io-index)",
+]
+
+[[package]]
 name = "read_color"
 version = "0.0.2"
 source = "git+https://github.com/PistonDevelopers/read_color#568723fb7d9a69833e1d5a5ec79ded8ce9562920"
@@ -260,19 +269,19 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 
 [[package]]
 name = "sdl2"
-version = "0.0.31"
-source = "git+https://github.com/AngryLawyer/rust-sdl2#2e0a39d29ed2deedccd9c89d9f08cec4191daab6"
+version = "0.0.32"
+source = "git+https://github.com/AngryLawyer/rust-sdl2#740fd428a05fda55e7c63a75d400ce42a0f5a459"
 dependencies = [
  "bitflags 0.1.1 (registry+https://github.com/rust-lang/crates.io-index)",
  "libc 0.1.3 (registry+https://github.com/rust-lang/crates.io-index)",
- "rand 0.2.1 (registry+https://github.com/rust-lang/crates.io-index)",
- "sdl2-sys 0.0.31 (git+https://github.com/AngryLawyer/rust-sdl2)",
+ "rand 0.3.0 (registry+https://github.com/rust-lang/crates.io-index)",
+ "sdl2-sys 0.0.32 (git+https://github.com/AngryLawyer/rust-sdl2)",
 ]
 
 [[package]]
 name = "sdl2-sys"
-version = "0.0.31"
-source = "git+https://github.com/AngryLawyer/rust-sdl2#2e0a39d29ed2deedccd9c89d9f08cec4191daab6"
+version = "0.0.32"
+source = "git+https://github.com/AngryLawyer/rust-sdl2#740fd428a05fda55e7c63a75d400ce42a0f5a459"
 dependencies = [
  "libc 0.1.3 (registry+https://github.com/rust-lang/crates.io-index)",
 ]
@@ -285,7 +294,7 @@ source = "git+https://github.com/pistondevelopers/shader_version#330c38b8fee173a
 [[package]]
 name = "vecmath"
 version = "0.0.5"
-source = "git+https://github.com/PistonDevelopers/vecmath#6284864573fe185f4d87aadfe38d0fc3b2edcd73"
+source = "git+https://github.com/PistonDevelopers/vecmath.git#6284864573fe185f4d87aadfe38d0fc3b2edcd73"
 
 [[package]]
 name = "xml-rs"
