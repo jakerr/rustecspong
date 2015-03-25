@@ -5,6 +5,8 @@ extern crate ecs;
 use ecs::*;
 use ecs::system::{EntityProcess, EntitySystem};
 
+extern crate vecmath;
+
 extern crate shader_version;
 extern crate input;
 extern crate event;
@@ -34,9 +36,10 @@ use sdl2_window::Sdl2Window;
 
 const WINDOW_W: f64 = 800.0;
 const WINDOW_H: f64 = 600.0;
-const WINDOW_PADDING: f64 = 20.0;
+const WINDOW_PADDING: f64 = 40.0;
 const VIEW_W: f64 = (WINDOW_W - 2.0 * WINDOW_PADDING);
 const VIEW_H: f64 = (WINDOW_H - 2.0 * WINDOW_PADDING);
+const DISP_FUDGE: f64 = 5.0;
 
 pub struct FadeSystem;
 
@@ -51,10 +54,11 @@ impl EntityProcess for FadeSystem {
         let event =  event.borrow();
         if let Some(update) = event.update_args() {
             for e in entities {
+                let f = data.fades[e].0;
                 let delete = {
                     let mut delete = false;
                     let color = &mut data.colors[e];
-                    color.0[3] -= 0.05;
+                    color.0[3] -= f;
                     if color.0[3] <= 0.0 {
                         delete = true;
                     }
@@ -167,7 +171,7 @@ impl EntityProcess for DrawSystem {
                                 );
                             }
                             shape::Line(l) => {
-                                let line = Line::new(color, 2.0);
+                                let line = Line::new(color, 1.0);
                                 line.draw(
                                     l,
                                     &c.draw_state,
@@ -193,6 +197,7 @@ impl System for CollisionSystem {
 impl EntityProcess for CollisionSystem {
     fn process(&mut self, entities: EntityIter<Components>, data: &mut DataHelper<Components, Services>) {
         use ShapeVarient::*;
+        use vecmath::*;
 
         let event = data.services.event.clone();
         let event =  event.borrow();
@@ -218,22 +223,41 @@ impl EntityProcess for CollisionSystem {
                         (s, c, square_center, circle_center, &Square(w,h), &Circle(r)) |
                         (c, s, circle_center, square_center, &Circle(r), &Square(w, h)) => {
                             let mut px = circle_center.clone();
-                            let mut vx = 1.0;
-                            let mut vy = 1.0;
-                            if circle_center.x < square_center.x - w { px.x = square_center.x - w; vx = -1.0 }
-                            if circle_center.x > square_center.x + w { px.x = square_center.x + w; vx = -1.0 }
-                            if circle_center.y < square_center.y - h { px.y = square_center.y - h; vy = -1.0 }
-                            if circle_center.y > square_center.y + h { px.y = square_center.y + h; vy = -1.0 }
+                            if circle_center.x < square_center.x - w { px.x = square_center.x - w; }
+                            if circle_center.x > square_center.x + w { px.x = square_center.x + w; }
+                            if circle_center.y < square_center.y - h { px.y = square_center.y - h; }
+                            if circle_center.y > square_center.y + h { px.y = square_center.y + h; }
 
-                            let dx = (px.x - circle_center.x);
-                            let dy = (px.y - circle_center.y);
+                            let center: Vector2<f64> = [circle_center.x, circle_center.y];
+                            let px: Vector2<f64> = [px.x, px.y];
+                            let aligned_r = vec2_scale(vec2_normalized(vec2_sub(px, center)), r);
+                            let cedge = vec2_add(center, aligned_r);
+                            let disp = vec2_scale(vec2_sub(px, cedge), DISP_FUDGE);
+                            let neg = vec2_scale(disp, -1.0);
+
+                            let dx = (px[0] - center[0]);
+                            let dy = (px[1] - center[1]);
                             let dist2 = dx * dx + dy * dy;
 
-                            dbg_line(data, [px.x, px.y, circle_center.x, circle_center.y]);
                             if r*r > dist2 {
+                                *(&mut(data.positions[*c].x)) += disp[0];
+                                *(&mut(data.positions[*c].y)) += disp[1];
+                                *(&mut(data.velocities[*s].x)) *= 0.5;
+                                *(&mut(data.velocities[*s].y)) *= 0.5;
                                 dbg_ghost(data, c);
-                                *(&mut(data.velocities[*c].x)) *= vx;
-                                *(&mut(data.velocities[*c].y)) *= vy;
+                                dbg_line(data, [center[0], center[1], center[0] + disp[0], center[1] + disp[1]], 0.01);
+
+                                let v = &mut data.velocities[*c];
+                                if disp[0] > 0.0 {
+                                    if v.x < 0.0 { v.x *= -1.0 }
+                                } else if disp[0] < 0.0 {
+                                    if v.x > 0.0 { v.x *= -1.0 }
+                                }
+                                if disp[1] > 0.0 {
+                                    if v.y < 0.0 { v.y *= -1.0 }
+                                } else if disp[1] < 0.0 {
+                                    if v.y > 0.0 { v.y *= -1.0 }
+                                }
                             }
                         }
                         _ => ()
@@ -295,14 +319,14 @@ impl EntityProcess for MoveSystem {
                         if px + w > view_width {
                           {
                               let position = &mut(data.positions[e]);
-                              position.x = view_width - w;
+                              position.x = view_width - w - DISP_FUDGE;
                           }
                           let velocity  = &mut(data.velocities[e]);
                           velocity.x *= velocity_mult;
                         } else if px - w < 0.0 {
                           {
                               let position = &mut(data.positions[e]);
-                              position.x = w;
+                              position.x = w + DISP_FUDGE;
                           }
                           let velocity  = &mut(data.velocities[e]);
                           velocity.x *= velocity_mult;
@@ -310,14 +334,14 @@ impl EntityProcess for MoveSystem {
                         if py + h > view_height {
                           {
                               let position = &mut(data.positions[e]);
-                              position.y = view_height - h;
+                              position.y = view_height - h - DISP_FUDGE;
                           }
                           let velocity  = &mut(data.velocities[e]);
                           velocity.y *= velocity_mult;
                         } else if py - h < 0.0 {
                           {
                               let position = &mut(data.positions[e]);
-                              position.y = h;
+                              position.y = h + DISP_FUDGE;
                           }
                           let velocity  = &mut(data.velocities[e]);
                           velocity.y *= velocity_mult;
@@ -334,6 +358,8 @@ impl EntityProcess for MoveSystem {
                         }
                       }
                 }
+                let (v, pos)  = (&data.velocities[e].clone(), &data.positions[e].clone());
+                dbg_line(data, [pos.x, pos.y, pos.x + v.x * dt * 10.0, pos.y + v.y * dt * 10.0], 1.0);
             }
         }
     }
@@ -407,7 +433,7 @@ pub struct Position {
 pub struct Shimmer;
 
 #[derive(Clone, PartialEq, Debug)]
-pub struct Fade;
+pub struct Fade(f32); // Speed of fade
 
 #[derive(Clone, PartialEq, Debug)]
 pub enum ShapeVarient {
@@ -494,7 +520,7 @@ impl<'a> EntityBuilder<Components> for EntityData<'a, Components> {
             let pos = t.positions[*self].clone();
             t.positions.add(&b, pos);
         }
-        t.fades.add(&b, Fade);
+        t.fades.add(&b, Fade(0.01));
     }
 }
 
@@ -503,7 +529,7 @@ fn dbg_ghost(d: &mut DataHelper<Components, Services>, entity: &EntityData<Compo
     d.create_entity(ghost);
 }
 
-fn dbg_line(d: &mut DataHelper<Components, Services>, line: [f64; 4]) {
+fn dbg_line(d: &mut DataHelper<Components, Services>, line: [f64; 4], speed: f32) {
     d.create_entity(|entity: BuildData<Components>, data: &mut Components| {
         data.positions.add(&entity,
             Position{
@@ -518,7 +544,7 @@ fn dbg_line(d: &mut DataHelper<Components, Services>, line: [f64; 4]) {
             }
         );
         data.colors.add(&entity, graphics::Color([0.0, 0.8, 0.0, 1.0]));
-        data.fades.add(&entity, Fade);
+        data.fades.add(&entity, Fade(speed));
     });
 }
 
@@ -528,8 +554,8 @@ fn make_ball(world: &mut World<Systems>) {
     let xoff = rng.gen_range(-100.0, 100.0);
     let yoff = rng.gen_range(-100.0, 100.0);
 
-    let vx = rng.gen_range(-300.0, 300.0);
-    let vy = rng.gen_range(-300.0, 300.0);
+    let vx = rng.gen_range(400.0, 500.0);
+    let vy = rng.gen_range(400.0, 500.0);
 
     let x = VIEW_W / 2.0 + xoff;
     let y = VIEW_H / 2.0 + yoff;
@@ -562,7 +588,7 @@ fn make_ball(world: &mut World<Systems>) {
 fn make_player(world: &mut World<Systems>, p1: bool) {
     const FROM_WALL: f64 = 20.0;
     const PADDLE_W: f64 = 10.0;
-    const PADDLE_H: f64 = 75.0;
+    const PADDLE_H: f64 = 60.0;
     let x = if p1 {
         FROM_WALL
     } else {
@@ -585,7 +611,7 @@ fn make_player(world: &mut World<Systems>, p1: bool) {
                 varient: ShapeVarient::Square(PADDLE_W, PADDLE_H),
                 border: None
         });
-        data.colors.add(&entity, graphics::Color([1.0, 0.5, 1.0, 1.0]));
+        data.colors.add(&entity, graphics::Color([0.3, 0.4, 1.0, 1.0]));
         data.player_controllers.add(&entity,
             PlayerController {
                 up: if p1 { keyboard::Key::W } else { keyboard::Key::I },
@@ -615,9 +641,6 @@ fn main() {
 
     let mut world = World::<Systems>::new();
     world.systems.draw.gl = Some(RefCell::new(gl));
-    make_ball(&mut world);
-    make_ball(&mut world);
-    make_ball(&mut world);
     make_ball(&mut world);
     make_player(&mut world, true);
     make_player(&mut world, false);
