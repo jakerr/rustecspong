@@ -54,3 +54,11 @@ pub struct Velocity {
     pub x: f64,
     pub y: f64
 }
+
+pub type Color = ::graphics::Color;
+
+#[derive(Clone, PartialEq, Debug)]
+pub struct HitCount {
+    pub recent: bool,
+    pub count: u32
+}

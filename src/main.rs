@@ -117,6 +117,7 @@ fn make_player(world: &mut World<Systems>, p1: bool) {
             WindowClamp {
                variant: ClampVariant::Stop
         });
+        data.hit_counts.add(&entity, HitCount { recent: false, count: 0 });
     });
 }
 

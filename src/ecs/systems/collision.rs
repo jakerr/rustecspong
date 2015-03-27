@@ -56,6 +56,18 @@ impl EntityProcess for CollisionSystem {
                             let dist2 = dx * dx + dy * dy;
 
                             if r*r > dist2 {
+                                if data.hit_counts.has(c) {
+                                    if !data.hit_counts[c].recent {
+                                        data.hit_counts[c].count += 1;
+                                        data.hit_counts[c].recent = true;
+                                    }
+                                }
+                                if data.hit_counts.has(s) {
+                                    if !data.hit_counts[s].recent {
+                                        data.hit_counts[s].count += 1;
+                                        data.hit_counts[s].recent = true;
+                                    }
+                                }
                                 *(&mut(data.positions[c].x)) += disp[0];
                                 *(&mut(data.positions[c].y)) += disp[1];
                                 *(&mut(data.velocities[s].x)) *= 0.5;
@@ -73,6 +85,13 @@ impl EntityProcess for CollisionSystem {
                                     if v.y < 0.0 { v.y *= -1.0 }
                                 } else if disp[1] < 0.0 {
                                     if v.y > 0.0 { v.y *= -1.0 }
+                                }
+                            } else {
+                                if data.hit_counts.has(c) {
+                                    data.hit_counts[c].recent = false;
+                                }
+                                if data.hit_counts.has(s) {
+                                    data.hit_counts[s].recent = false;
                                 }
                             }
                         }

@@ -2,7 +2,6 @@ pub mod systems;
 pub mod components;
 
 use self::components::*;
-use super::graphics::Color;
 use std::cell::RefCell;
 use std::cell::Cell;
 use std::rc::Rc;
@@ -50,14 +49,15 @@ pub mod scaffold {
 
     components! {
         Components {
+            #[hot] clamps: WindowClamp,
+            #[hot] colors: Color,
+            #[hot] fades: Fade,
+            #[hot] hit_counts: HitCount,
+            #[hot] player_controllers: PlayerController,
             #[hot] positions: Position,
             #[hot] shapes: Shape,
-            #[hot] velocities: Velocity,
-            #[hot] colors: super::super::graphics::Color,
-            #[hot] fades: Fade,
             #[hot] shimmers: Shimmer,
-            #[hot] player_controllers: PlayerController,
-            #[hot] clamps: WindowClamp
+            #[hot] velocities: Velocity,
         }
     }
 
@@ -86,6 +86,10 @@ pub mod scaffold {
             draw: EntitySystem<ecs::systems::DrawSystem> = EntitySystem::new(
                 ecs::systems::DrawSystem{ gl: None },
                 aspect!(<Components> all: [positions, shapes, colors])
+            ),
+            game: EntitySystem<ecs::systems::GameSystem> = EntitySystem::new(
+                ecs::systems::GameSystem,
+                aspect!(<Components> all: [hit_counts])
             )
         }
     }
