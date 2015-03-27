@@ -3,8 +3,7 @@ use ecsrs::system::{EntityProcess, EntitySystem};
 use ecs::scaffold::{Components, Services};
 use event::{Event, ReleaseEvent, UpdateEvent, PressEvent, RenderEvent, RenderArgs, UpdateArgs};
 
-use std::rand;
-use std::rand::Rng;
+use rand::{self, Rng};
 
 pub struct ShimmerSystem;
 
@@ -18,7 +17,7 @@ impl EntityProcess for ShimmerSystem {
         let event = data.services.event.clone();
         let event =  event.borrow();
         if let Some(update) = event.render_args() {
-            for e in entities {
+            for ref e in entities {
                 let color = &mut data.colors[e];
                 let ref mut rng = rand::thread_rng();
                 color.0[0] = rng.gen_range(0.3, 1.0);

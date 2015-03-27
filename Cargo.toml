@@ -37,3 +37,6 @@ git = "https://github.com/pistondevelopers/window"
 
 [dependencies.quack]
 git = "https://github.com/pistondevelopers/quack"
+
+[dependencies]
+rand = "0.3.3"

@@ -16,7 +16,7 @@ impl EntityProcess for MoveSystem {
         use graphics::*;
         use ecs::components::ShapeVariant as shape;
         use ecs::components::ClampVariant::*;
-        for e in entities {
+        for ref e in entities {
             let (vx, vy) = {
                 let v = &data.velocities[e];
                 (v.x, v.y)
@@ -27,8 +27,8 @@ impl EntityProcess for MoveSystem {
             let event =  event.borrow();
                 if let Some(update) = event.update_args() {
                     let dt = update.dt;
-                    let view_width = ::WINDOW_W as f64 - 2.0 * ::WINDOW_PADDING;
-                    let view_height = ::WINDOW_H as f64 - 2.0 * ::WINDOW_PADDING;
+                    let view_width = ::WINDOW_W - 2.0 * ::WINDOW_PADDING;
+                    let view_height = ::WINDOW_H - 2.0 * ::WINDOW_PADDING;
 
                     let (px, py) = {
                         let position = &mut(data.positions[e]);

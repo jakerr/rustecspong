@@ -100,15 +100,15 @@ pub mod scaffold {
     impl<'a> EntityBuilder<Components> for EntityData<'a, Components> {
         fn build<'b>(&mut self, b: BuildData<'b, Components>, t: &mut Components) {
             if t.colors.has(self) {
-                let color = t.colors[*self];
+                let color = t.colors[&*self];
                 t.colors.add(&b, color);
             }
             if t.shapes.has(self) {
-                let shape = t.shapes[*self].clone();
+                let shape = t.shapes[&*self].clone();
                 t.shapes.add(&b, shape);
             }
             if t.positions.has(self) {
-                let pos = t.positions[*self].clone();
+                let pos = t.positions[&*self].clone();
                 t.positions.add(&b, pos);
             }
             t.fades.add(&b, Fade(0.01));

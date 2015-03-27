@@ -14,7 +14,7 @@ impl EntityProcess for ControlSystem {
         use input::Button::Keyboard;
         use event::{ReleaseEvent, UpdateEvent, PressEvent, RenderEvent, RenderArgs, UpdateArgs};
         const PADDLE_V: f64 = 800.0;
-        for e in entities {
+        for ref e in entities {
             let (vx, vy) = {
                 let v = &data.velocities[e];
                 (v.x, v.y)

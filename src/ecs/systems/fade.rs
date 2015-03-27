@@ -15,7 +15,7 @@ impl EntityProcess for FadeSystem {
         let event = data.services.event.clone();
         let event =  event.borrow();
         if let Some(update) = event.update_args() {
-            for e in entities {
+            for ref e in entities {
                 let f = data.fades[e].0;
                 let delete = {
                     let mut delete = false;
@@ -27,7 +27,7 @@ impl EntityProcess for FadeSystem {
                     delete
                 };
                 if delete {
-                    data.remove_entity(**e);
+                    data.remove_entity(***e);
                 }
             }
         }

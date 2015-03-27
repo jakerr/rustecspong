@@ -1,9 +1,10 @@
 #![allow(unused_variables, unused_imports)]
 
 #[macro_use]
-extern crate "ecs" as ecsrs;
+extern crate ecs as ecsrs;
 
 extern crate vecmath;
+extern crate rand;
 
 extern crate shader_version;
 extern crate input;
@@ -20,8 +21,7 @@ use window::WindowSettings;
 use ecsrs::*;
 
 use std::collections::HashMap;
-use std::rand;
-use std::rand::Rng;
+use rand::Rng;
 use event::{Event, ReleaseEvent, UpdateEvent, PressEvent, RenderEvent, RenderArgs, UpdateArgs};
 use quack::Set;
 use std::cell::RefCell;
