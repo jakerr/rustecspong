@@ -18,11 +18,11 @@ impl EntityProcess for MoveSystem {
         use ecs::components::ClampVariant::*;
         for ref e in entities {
             let (vx, vy) = {
-                let v = &data.velocities[e];
+                let v = &data.velocities[*e];
                 (v.x, v.y)
             };
-            let shape = data.shapes[e].clone();
-            let clamp = data.clamps[e].clone();
+            let shape = data.shapes[*e].clone();
+            let clamp = data.clamps[*e].clone();
             let event = data.services.event.clone();
             let event =  event.borrow();
                 if let Some(update) = event.update_args() {
@@ -31,7 +31,7 @@ impl EntityProcess for MoveSystem {
                     let view_height = ::WINDOW_H - 2.0 * ::WINDOW_PADDING;
 
                     let (px, py) = {
-                        let position = &mut(data.positions[e]);
+                        let position = &mut(data.positions[*e]);
                         position.x += vx * dt;
                         position.y += vy * dt;
                         (position.x, position.y)
@@ -54,32 +54,32 @@ impl EntityProcess for MoveSystem {
                       Bounce | Stop => {
                         if px + w > view_width {
                           {
-                              let position = &mut(data.positions[e]);
+                              let position = &mut(data.positions[*e]);
                               position.x = view_width - w - ::DISP_FUDGE;
                           }
-                          let velocity  = &mut(data.velocities[e]);
+                          let velocity  = &mut(data.velocities[*e]);
                           velocity.x *= velocity_mult;
                         } else if px - w < 0.0 {
                           {
-                              let position = &mut(data.positions[e]);
+                              let position = &mut(data.positions[*e]);
                               position.x = w + ::DISP_FUDGE;
                           }
-                          let velocity  = &mut(data.velocities[e]);
+                          let velocity  = &mut(data.velocities[*e]);
                           velocity.x *= velocity_mult;
                         }
                         if py + h > view_height {
                           {
-                              let position = &mut(data.positions[e]);
+                              let position = &mut(data.positions[*e]);
                               position.y = view_height - h - ::DISP_FUDGE;
                           }
-                          let velocity  = &mut(data.velocities[e]);
+                          let velocity  = &mut(data.velocities[*e]);
                           velocity.y *= velocity_mult;
                         } else if py - h < 0.0 {
                           {
-                              let position = &mut(data.positions[e]);
+                              let position = &mut(data.positions[*e]);
                               position.y = h + ::DISP_FUDGE;
                           }
-                          let velocity  = &mut(data.velocities[e]);
+                          let velocity  = &mut(data.velocities[*e]);
                           velocity.y *= velocity_mult;
                         }
                       },
@@ -94,7 +94,7 @@ impl EntityProcess for MoveSystem {
                         }
                       }
                 }
-                let (v, pos)  = (&data.velocities[e].clone(), &data.positions[e].clone());
+                let (v, pos)  = (&data.velocities[*e].clone(), &data.positions[*e].clone());
                 debug::line(data, [pos.x, pos.y, pos.x + v.x * dt * 10.0, pos.y + v.y * dt * 10.0], 1.0);
             }
         }

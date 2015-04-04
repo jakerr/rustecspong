@@ -14,9 +14,9 @@ impl System for GameSystem {
 impl EntityProcess for GameSystem {
     fn process(&mut self, entities: EntityIter<Components>, data: &mut DataHelper<Components, Services>) {
         for ref e in entities {
-            let hits = data.hit_counts[e].clone();
-            let col = &mut data.colors[e];
-            col.0[0] = (hits.count as f32 * 0.1);
+            let hits = data.hit_counts[*e].clone();
+            let col = &mut data.colors[*e];
+            col[0] = (hits.count as f32 * 0.1);
         }
     }
 }

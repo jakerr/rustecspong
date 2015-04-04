@@ -18,11 +18,11 @@ impl EntityProcess for ShimmerSystem {
         let event =  event.borrow();
         if let Some(update) = event.render_args() {
             for ref e in entities {
-                let color = &mut data.colors[e];
+                let color = &mut data.colors[*e];
                 let ref mut rng = rand::thread_rng();
-                color.0[0] = rng.gen_range(0.3, 1.0);
-                color.0[1] = rng.gen_range(0.3, 1.0);
-                color.0[2] = rng.gen_range(0.3, 1.0);
+                color[0] = rng.gen_range(0.3, 1.0);
+                color[1] = rng.gen_range(0.3, 1.0);
+                color[2] = rng.gen_range(0.3, 1.0);
             }
         }
     }

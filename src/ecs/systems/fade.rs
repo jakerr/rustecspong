@@ -16,12 +16,12 @@ impl EntityProcess for FadeSystem {
         let event =  event.borrow();
         if let Some(update) = event.update_args() {
             for ref e in entities {
-                let f = data.fades[e].0;
+                let f = data.fades[*e].0;
                 let delete = {
                     let mut delete = false;
-                    let color = &mut data.colors[e];
-                    color.0[3] -= f;
-                    if color.0[3] <= 0.0 {
+                    let color = &mut data.colors[*e];
+                    color[3] -= f;
+                    if color[3] <= 0.0 {
                         delete = true;
                     }
                     delete

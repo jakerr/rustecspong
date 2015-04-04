@@ -73,7 +73,7 @@ fn make_ball(world: &mut World<Systems>) {
                 variant: ShapeVariant::Circle(BALL_R),
                 border: None
         });
-        data.colors.add(&entity, graphics::Color([1.0, 0.5, 0.2, 1.0]));
+        data.colors.add(&entity, [1.0, 0.5, 0.2, 1.0]);
         data.clamps.add(&entity,
             WindowClamp {
                variant: ClampVariant::Bounce
@@ -107,7 +107,7 @@ fn make_player(world: &mut World<Systems>, p1: bool) {
                 variant: ShapeVariant::Square(PADDLE_W, PADDLE_H),
                 border: None
         });
-        data.colors.add(&entity, graphics::Color([0.3, 0.4, 1.0, 1.0]));
+        data.colors.add(&entity, [0.3, 0.4, 1.0, 1.0]);
         data.player_controllers.add(&entity,
             PlayerController {
                 up: if p1 { keyboard::Key::W } else { keyboard::Key::I },
@@ -123,17 +123,12 @@ fn make_player(world: &mut World<Systems>, p1: bool) {
 
 fn main() {
     let opengl = shader_version::OpenGL::_3_2;
-    let window = Sdl2Window::new(
-        opengl,
-        WindowSettings {
-            title: "Pong".to_string(),
-            size: [WINDOW_W as u32, WINDOW_H as u32],
-            fullscreen: false,
-            exit_on_esc: true,
-            samples: 4,
-        }
-    );
-
+    let settings = WindowSettings::new("Pong".to_string(),
+            window::Size {
+                width: WINDOW_W as u32,
+                height: WINDOW_H as u32
+            }).fullscreen(true).exit_on_esc(true).samples(4);
+    let window = Rc::new(RefCell::new(Sdl2Window::new(opengl, settings)));
     let mut gl = Gl::new(opengl);
 
     let mut world = World::<Systems>::new();

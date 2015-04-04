@@ -16,16 +16,16 @@ impl EntityProcess for ControlSystem {
         const PADDLE_V: f64 = 800.0;
         for ref e in entities {
             let (vx, vy) = {
-                let v = &data.velocities[e];
+                let v = &data.velocities[*e];
                 (v.x, v.y)
             };
             let event = data.services.event.clone();
             let event =  event.borrow();
             let (up, down) = {
-                let controller  = &(data.player_controllers[e]);
+                let controller  = &(data.player_controllers[*e]);
                 (Keyboard(controller.up), Keyboard(controller.down))
             };
-            let velocity = &mut(data.velocities[e]);
+            let velocity = &mut(data.velocities[*e]);
             event.press(|button| {
                 if button == up {
                     velocity.y = -PADDLE_V;

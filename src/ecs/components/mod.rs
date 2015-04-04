@@ -55,7 +55,7 @@ pub struct Velocity {
     pub y: f64
 }
 
-pub type Color = ::graphics::Color;
+pub type Color = ::graphics::types::Color;
 
 #[derive(Clone, PartialEq, Debug)]
 pub struct HitCount {

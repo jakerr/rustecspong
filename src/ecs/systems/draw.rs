@@ -24,6 +24,7 @@ impl EntityProcess for DrawSystem {
     fn process(&mut self, entities: EntityIter<Components>, data: &mut DataHelper<Components, Services>) {
         use ::graphics;
         use graphics::*;
+//        use graphics::types::{Color};
         use ecs::components::ShapeVariant as shape;
         use event::{ReleaseEvent, UpdateEvent, PressEvent, RenderEvent, RenderArgs, UpdateArgs};
         let pad = ::WINDOW_PADDING;
@@ -43,10 +44,10 @@ impl EntityProcess for DrawSystem {
                                         [1.0, 1.0, view_width - 2.0,  view_height - 2.0],
                                         c.transform,
                                         gl);
-                    for e in entities {
-                        let position = &data.positions[e];
-                        let shape = &data.shapes[e];
-                        let graphics::Color(color) = data.colors[e];
+                    for ref e in entities {
+                        let position = &data.positions[*e];
+                        let shape = &data.shapes[*e];
+                        let color = data.colors[*e];
                         match shape.variant {
                             shape::Circle(rad) => {
                                 let circle = Ellipse::new(color);
