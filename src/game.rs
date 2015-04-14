@@ -17,9 +17,13 @@ extern crate quack;
 
 mod ecs;
 
-use window::WindowSettings;
+extern crate gl_common;
+use gl_common::GlFunctionsSource;
+
+use window::{WindowSettings, OpenGLWindow};
 use ecsrs::*;
 
+use std::ops::Deref;
 use std::collections::HashMap;
 use rand::Rng;
 use event::{Event, ReleaseEvent, UpdateEvent, PressEvent, RenderEvent, RenderArgs, UpdateArgs};
@@ -43,6 +47,11 @@ const WINDOW_PADDING: f64 = 40.0;
 const VIEW_W: f64 = (WINDOW_W - 2.0 * WINDOW_PADDING);
 const VIEW_H: f64 = (WINDOW_H - 2.0 * WINDOW_PADDING);
 const DISP_FUDGE: f64 = 5.0;
+
+pub mod gles {
+    include!(concat!(env!("OUT_DIR"), "/gl_bindings.rs"));
+}
+
 
 fn make_ball(world: &mut World<Systems>) {
     const BALL_R: f64 = 10.0;
@@ -121,14 +130,22 @@ fn make_player(world: &mut World<Systems>, p1: bool) {
     });
 }
 
-fn main() {
-    let opengl = shader_version::OpenGL::_3_2;
+#[no_mangle]
+pub extern fn rustecspong_main() {
+    println!("before shader");
+    let opengl = shader_version::OpenGL::_2_0;
+    println!("before settings");
     let settings = WindowSettings::new("Pong".to_string(),
             window::Size {
                 width: WINDOW_W as u32,
                 height: WINDOW_H as u32
             }).fullscreen(true).exit_on_esc(true).samples(4);
-    let window = Rc::new(RefCell::new(Sdl2Window::new(opengl, settings)));
+    println!("before window now");
+    let mut window = Sdl2Window::new(opengl, settings);
+    gles::load_with(|s| window.get_proc_address(s));
+    let window = Rc::new(RefCell::new(window));
+
+    println!("before new opengllll");
     let mut gl = Gl::new(opengl);
 
     let mut world = World::<Systems>::new();
