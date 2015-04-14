@@ -3,6 +3,7 @@
 name = "rustecspong"
 version = "0.0.1"
 authors = ["Jake Kerr <kodafox@gmail.com>"]
+build = "build.rs"
 
 [lib]
 name = "rustecspong"
@@ -41,3 +42,9 @@ git = "https://github.com/pistondevelopers/quack"
 
 [dependencies]
 rand = "0.3.3"
+gl_common = "*"
+libc = "*"
+
+[build-dependencies]
+gl_generator = "*"
+khronos_api = "*"
