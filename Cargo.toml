@@ -4,9 +4,10 @@ name = "rustecspong"
 version = "0.0.1"
 authors = ["Jake Kerr <kodafox@gmail.com>"]
 
-[[bin]]
-
+[lib]
 name = "rustecspong"
+path = "src/game.rs"
+crate-type = ["staticlib"]
 
 [dependencies.ecs]
 git = "https://github.com/HeroesGrave/ecs-rs.git"
