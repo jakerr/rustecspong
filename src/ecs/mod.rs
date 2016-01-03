@@ -39,7 +39,7 @@ pub mod debug {
 
 pub mod scaffold {
     use ecs;
-    use event::{Event, ReleaseEvent, UpdateEvent, PressEvent, RenderEvent, RenderArgs, UpdateArgs};
+    use piston::input::{Event, ReleaseEvent, UpdateEvent, PressEvent, RenderEvent, RenderArgs, UpdateArgs};
     use ecsrs::system::{EntityProcess, EntitySystem};
     use ecsrs::*;
     use super::components::*;
@@ -48,7 +48,7 @@ pub mod scaffold {
     use std::rc::Rc;
 
     components! {
-        Components {
+        struct Components {
             #[hot] clamps: WindowClamp,
             #[hot] colors: Color,
             #[hot] fades: Fade,
@@ -62,7 +62,7 @@ pub mod scaffold {
     }
 
     systems! {
-        Systems<Components, Services> {
+        struct Systems<Components, Services> {
             fade: EntitySystem<ecs::systems::FadeSystem> = EntitySystem::new(
                 ecs::systems::FadeSystem,
                 aspect!(<Components> all: [colors, fades])
@@ -94,25 +94,33 @@ pub mod scaffold {
         }
     }
 
-    services! {
-        Services {
-            event: RefCell<Event> =
-                RefCell::new(Event::Update(UpdateArgs { dt: 3.14 }))
+
+    pub struct Services {
+        pub event: RefCell<Event>,
+    }
+
+    impl ServiceManager for Services {}
+
+    impl Default for Services {
+        fn default() -> Services {
+            Services {
+                event: RefCell::new(Event::Update(UpdateArgs { dt: 3.14 }))
+            }
         }
     }
 
     impl<'a> EntityBuilder<Components> for EntityData<'a, Components> {
-        fn build<'b>(&mut self, b: BuildData<'b, Components>, t: &mut Components) {
-            if t.colors.has(self) {
-                let color = t.colors[*self];
+        fn build<'b>(self, b: BuildData<'b, Components>, t: &mut Components) {
+            if t.colors.has(&self) {
+                let color = t.colors[self];
                 t.colors.add(&b, color);
             }
-            if t.shapes.has(self) {
-                let shape = t.shapes[*self].clone();
+            if t.shapes.has(&self) {
+                let shape = t.shapes[self].clone();
                 t.shapes.add(&b, shape);
             }
-            if t.positions.has(self) {
-                let pos = t.positions[*self].clone();
+            if t.positions.has(&self) {
+                let pos = t.positions[self].clone();
                 t.positions.add(&b, pos);
             }
             t.fades.add(&b, Fade(0.01));

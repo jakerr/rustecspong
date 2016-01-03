@@ -2,7 +2,7 @@ use ecsrs::*;
 use ecsrs::system::{EntityProcess, EntitySystem};
 use ecs::debug;
 use ecs::scaffold::{Components, Services};
-use event::{Event, ReleaseEvent, UpdateEvent, PressEvent, RenderEvent, RenderArgs, UpdateArgs};
+use piston::input::{Event, ReleaseEvent, UpdateEvent, PressEvent, RenderEvent, RenderArgs, UpdateArgs};
 
 pub struct GameSystem;
 
@@ -16,7 +16,7 @@ impl EntityProcess for GameSystem {
         for ref e in entities {
             let hits = data.hit_counts[*e].clone();
             let col = &mut data.colors[*e];
-            col[0] = (hits.count as f32 * 0.1);
+            col[0] = hits.count as f32 * 0.1;
         }
     }
 }

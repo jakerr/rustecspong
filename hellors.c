@@ -1,6 +1,6 @@
 /* Hello World program */
-extern void rustecspong_main();
+extern void pong_main();
 
 int main() {
-  rustecspong_main();
+  pong_main();
 }

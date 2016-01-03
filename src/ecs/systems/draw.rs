@@ -6,12 +6,10 @@ use ecs::scaffold::{Components, Services};
 use std::cell::RefCell;
 use std::cell::Cell;
 use std::rc::Rc;
-use opengl_graphics::{
-    Gl,
-};
+use opengl_graphics::GlGraphics;
 
 pub struct DrawSystem {
-    pub gl: Option<RefCell<Gl>>,
+    pub gl: Option<RefCell<GlGraphics>>,
 }
 
 
@@ -26,7 +24,7 @@ impl EntityProcess for DrawSystem {
         use graphics::*;
 //        use graphics::types::{Color};
         use ecs::components::ShapeVariant as shape;
-        use event::{ReleaseEvent, UpdateEvent, PressEvent, RenderEvent, RenderArgs, UpdateArgs};
+        use piston::input::{ReleaseEvent, UpdateEvent, PressEvent, RenderEvent, RenderArgs, UpdateArgs};
         let pad = ::WINDOW_PADDING;
         if let Some(ref gl_cell) = self.gl {
             let mut gl = gl_cell.borrow_mut();
@@ -34,7 +32,7 @@ impl EntityProcess for DrawSystem {
             if let Some(render) = event.render_args() {
                 let view_width = render.width as f64 - 2.0 * pad;
                 let view_height = render.height as f64 - 2.0 * pad;
-                gl.draw([pad as i32, pad as i32, view_width as i32, view_height as i32], |c, gl| { // viewport
+                gl.draw(render.viewport(), |c, gl| { // viewport
                     graphics::clear([0.2, 0.2, 0.2, 1.0], gl);
                     graphics::rectangle([0.0, 1.0, 0.0, 1.0],
                                         [0.0, 0.0, view_width, view_height],

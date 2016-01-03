@@ -11,8 +11,8 @@ impl System for ControlSystem {
 
 impl EntityProcess for ControlSystem {
     fn process(&mut self, entities: EntityIter<Components>, data: &mut DataHelper<Components, Services>) {
-        use input::Button::Keyboard;
-        use event::{ReleaseEvent, UpdateEvent, PressEvent, RenderEvent, RenderArgs, UpdateArgs};
+        use piston::input::Button::Keyboard;
+        use piston::input::{ReleaseEvent, UpdateEvent, PressEvent, RenderEvent, RenderArgs, UpdateArgs};
         const PADDLE_V: f64 = 800.0;
         for ref e in entities {
             let (vx, vy) = {

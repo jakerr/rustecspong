@@ -13,7 +13,7 @@ impl EntityProcess for CollisionSystem {
     fn process(&mut self, entities: EntityIter<Components>, data: &mut DataHelper<Components, Services>) {
         use vecmath::*;
         use ecs::components::ShapeVariant::*;
-        use event::{ReleaseEvent, UpdateEvent, PressEvent, RenderEvent, RenderArgs, UpdateArgs};
+        use piston::input::{ReleaseEvent, UpdateEvent, PressEvent, RenderEvent, RenderArgs, UpdateArgs};
 
         let event = data.services.event.clone();
         let event =  event.borrow();

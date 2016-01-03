@@ -1,7 +1,7 @@
 use ecsrs::*;
 use ecsrs::system::{EntityProcess, EntitySystem};
 use ecs::scaffold::{Components, Services};
-use event::{Event, ReleaseEvent, UpdateEvent, PressEvent, RenderEvent, RenderArgs, UpdateArgs};
+use piston::input::{Event, ReleaseEvent, UpdateEvent, PressEvent, RenderEvent, RenderArgs, UpdateArgs};
 
 use rand::{self, Rng};
 

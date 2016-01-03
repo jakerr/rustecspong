@@ -1,5 +1,5 @@
 use std::default::Default;
-use input::keyboard;
+use piston::input::keyboard;
 
 #[derive(Clone, PartialEq, Debug)]
 pub enum ClampVariant {

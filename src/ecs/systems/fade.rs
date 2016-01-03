@@ -1,7 +1,7 @@
 use ecsrs::*;
 use ecsrs::system::{EntityProcess, EntitySystem};
 use ecs::scaffold::{Components, Services};
-use event::{ReleaseEvent, UpdateEvent, PressEvent, RenderEvent, RenderArgs, UpdateArgs};
+use piston::input::{ReleaseEvent, UpdateEvent, PressEvent, RenderEvent, RenderArgs, UpdateArgs};
 
 pub struct FadeSystem;
 

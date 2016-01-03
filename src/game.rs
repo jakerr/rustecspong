@@ -3,37 +3,33 @@
 #[macro_use]
 extern crate ecs as ecsrs;
 
-extern crate vecmath;
-extern crate rand;
-
-extern crate shader_version;
-extern crate input;
-extern crate event;
 extern crate graphics;
-extern crate sdl2_window;
-extern crate window;
 extern crate opengl_graphics;
-extern crate quack;
+extern crate piston;
+//extern crate piston_window;
+extern crate rand;
+extern crate sdl2_window;
+extern crate shader_version;
+extern crate vecmath;
 
 mod ecs;
 
-use window::WindowSettings;
 use ecsrs::*;
-
-use std::collections::HashMap;
+//use piston::input::{Event, ReleaseEvent, UpdateEvent, PressEvent, RenderEvent, RenderArgs, UpdateArgs};
+//use piston::input::Button::Keyboard;
+//use piston::input::keyboard;
+use piston::input::*;
+use piston::event_loop::*;
 use rand::Rng;
-use event::{Event, ReleaseEvent, UpdateEvent, PressEvent, RenderEvent, RenderArgs, UpdateArgs};
-use quack::Set;
-use std::cell::RefCell;
 use std::cell::Cell;
+use std::cell::RefCell;
+use std::collections::HashMap;
 use std::rc::Rc;
-use input::Button::Keyboard;
-use input::keyboard;
+use piston::window::{WindowSettings};
+//use piston_window::{PistonWindow};
 
-use opengl_graphics::{
-    Gl,
-};
-use sdl2_window::Sdl2Window;
+use opengl_graphics::{OpenGL, GlGraphics};
+use sdl2_window::Sdl2Window as Window;
 use self::ecs::components::*;
 use self::ecs::scaffold::{Systems, Components};
 
@@ -121,15 +117,17 @@ fn make_player(world: &mut World<Systems>, p1: bool) {
     });
 }
 
+//#[no_mangle]
 fn main() {
-    let opengl = shader_version::OpenGL::_3_2;
-    let settings = WindowSettings::new("Pong".to_string(),
-            window::Size {
-                width: WINDOW_W as u32,
-                height: WINDOW_H as u32
-            }).fullscreen(true).exit_on_esc(true).samples(4);
-    let window = Rc::new(RefCell::new(Sdl2Window::new(opengl, settings)));
-    let mut gl = Gl::new(opengl);
+    let opengl = OpenGL::V3_2;
+    let window: Window = WindowSettings::new(
+      "Pong".to_string(),
+      piston::window::Size {
+          width: WINDOW_W as u32,
+          height: WINDOW_H as u32
+      }
+    ).fullscreen(true).exit_on_esc(true).samples(4).build().unwrap();
+    let mut gl = GlGraphics::new(opengl);
 
     let mut world = World::<Systems>::new();
     world.systems.draw.gl = Some(RefCell::new(gl));
@@ -137,8 +135,8 @@ fn main() {
     make_player(&mut world, true);
     make_player(&mut world, false);
 
-    for e in event::events(window) {
-        use event::{ ReleaseEvent, UpdateEvent, PressEvent, RenderEvent};
+    for e in window.events() {
+        use piston::input::{ ReleaseEvent, UpdateEvent, PressEvent, RenderEvent};
         *(world.data.services.event.borrow_mut()) = e;
         world.update();
     }

@@ -1,43 +1,18 @@
 [package]
-
+authors = ["Jake Kerr <kodafox@gmail.com>"]
 name = "rustecspong"
 version = "0.0.1"
-authors = ["Jake Kerr <kodafox@gmail.com>"]
-
-[lib]
-name = "rustecspong"
-path = "src/game.rs"
-crate-type = ["staticlib"]
-
-[dependencies.ecs]
-git = "https://github.com/HeroesGrave/ecs-rs.git"
-
-[dependencies.pistoncore-sdl2_window]
-git = "https://github.com/pistondevelopers/sdl2_window"
-
-[dependencies.pistoncore-event]
-git = "https://github.com/pistondevelopers/event"
-
-[dependencies.vecmath]
-git = "https://github.com/PistonDevelopers/vecmath.git"
-
-[dependencies.piston2d-graphics]
-git = "https://github.com/pistondevelopers/graphics"
-
-[dependencies.piston2d-opengl_graphics]
-git = "https://github.com/pistondevelopers/opengl_graphics"
-
-[dependencies.shader_version]
-git = "https://github.com/pistondevelopers/shader_version"
-
-[dependencies.pistoncore-input]
-git = "https://github.com/pistondevelopers/input"
-
-[dependencies.pistoncore-window]
-git = "https://github.com/pistondevelopers/window"
-
-[dependencies.quack]
-git = "https://github.com/pistondevelopers/quack"
 
 [dependencies]
+ecs = "*"
+piston = "0.16.0"
+piston2d-graphics = "0.12.0"
+piston2d-opengl_graphics = "0.21.0"
+pistoncore-sdl2_window = "0.22.0"
 rand = "0.3.3"
+shader_version = "0.2.1"
+vecmath = "0.2.0"
+
+[[bin]]
+name = "rustecspong"
+path = "src/game.rs"

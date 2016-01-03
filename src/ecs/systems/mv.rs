@@ -2,7 +2,7 @@ use ecsrs::*;
 use ecsrs::system::{EntityProcess, EntitySystem};
 use ecs::debug;
 use ecs::scaffold::{Components, Services};
-use event::{Event, ReleaseEvent, UpdateEvent, PressEvent, RenderEvent, RenderArgs, UpdateArgs};
+use piston::input::{Event, ReleaseEvent, UpdateEvent, PressEvent, RenderEvent, RenderArgs, UpdateArgs};
 
 pub struct MoveSystem;
 
